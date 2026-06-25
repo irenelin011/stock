@@ -1,0 +1,1988 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易日誌 — 專業版</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e3dd;
+    --border-strong: #c8c7c0;
+    --text: #1a1a18;
+    --text-2: #5a5a56;
+    --text-3: #9a9a94;
+    --blue: #1a5fa8;
+    --blue-light: #e8f0fb;
+    --blue-mid: #3a7fd4;
+    --green: #2a7a3a;
+    --green-light: #e8f5eb;
+    --red: #c0291e;
+    --red-light: #fdecea;
+    --amber: #b06010;
+    --amber-light: #fdf3e3;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+
+  /* Layout */
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar { width: 220px; background: var(--surface); border-right: 1px solid var(--border); padding: 0; flex-shrink: 0; display: flex; flex-direction: column; }
+  .sidebar-logo { padding: 24px 20px 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-logo .logo-mark { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--blue); text-transform: uppercase; margin-bottom: 4px; }
+  .sidebar-logo h1 { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.3; }
+  .sidebar-nav { padding: 12px 0; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13px; color: var(--text-2); cursor: pointer; border-left: 2px solid transparent; transition: all .15s; }
+  .nav-item:hover { color: var(--text); background: var(--bg); }
+  .nav-item.active { color: var(--blue); background: var(--blue-light); border-left-color: var(--blue); font-weight: 500; }
+  .nav-item .nav-icon { font-size: 16px; width: 18px; text-align: center; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-3); }
+
+  .main { flex: 1; overflow-y: auto; }
+  .page-header { padding: 24px 32px 0; border-bottom: 1px solid var(--border); background: var(--surface); display: flex; justify-content: space-between; align-items: flex-end; }
+  .page-header-text h2 { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  .page-header-text p { font-size: 12px; color: var(--text-2); padding-bottom: 16px; }
+  .page-header-actions { padding-bottom: 16px; flex-shrink: 0; }
+  .content { padding: 24px 32px; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Section headers */
+  .mod-row { display: flex; align-items: center; gap: 8px; margin: 24px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .mod-row:first-child { margin-top: 0; }
+  .mod-chip { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; padding: 2px 8px; border-radius: 20px; background: var(--blue-light); color: var(--blue); text-transform: uppercase; }
+  .mod-title { font-size: 13px; font-weight: 600; }
+  .mod-hint { font-size: 11px; color: var(--text-3); margin-left: auto; }
+
+  /* Grid */
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .mt8 { margin-top: 8px; }
+  .mt12 { margin-top: 12px; }
+
+  /* Form elements */
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; font-weight: 600; color: var(--text-2); letter-spacing: 0.03em; }
+  .field input, .field select, .field textarea {
+    font-size: 13px; padding: 8px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); width: 100%;
+    transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(58,127,212,.12); }
+  .field textarea { resize: vertical; min-height: 64px; font-family: inherit; line-height: 1.5; }
+  .field input[readonly] { background: var(--bg); color: var(--text-2); }
+  .field-note { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  /* Pills / tags */
+  .pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pill { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text-2); user-select: none; transition: all .12s; }
+  .pill:hover { border-color: var(--border-strong); color: var(--text); }
+  .pill.on { background: var(--blue-light); color: var(--blue); border-color: var(--blue-mid); }
+  .pill.on.chip { background: var(--amber-light); color: var(--amber); border-color: #d4801a; }
+  .pill.on.fund { background: #ede9fe; color: #5b21b6; border-color: #8b5cf6; }
+
+  /* RR display */
+  .rr-box { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg); margin-top: 10px; }
+  .rr-num { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rr-good { color: var(--green); }
+  .rr-warn { color: var(--amber); }
+  .rr-bad { color: var(--red); }
+  .rr-info { flex: 1; }
+  .rr-verdict { font-size: 12px; font-weight: 500; }
+  .rr-rule { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  /* Position calculator */
+  .pos-box { background: var(--blue-light); border: 1px solid #b5d4f4; border-radius: var(--radius-lg); padding: 16px 20px; margin-top: 10px; }
+  .pos-result { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
+  .pos-item { background: var(--surface); border-radius: var(--radius); padding: 10px 14px; }
+  .pos-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .pos-val { font-size: 18px; font-weight: 700; color: var(--blue); }
+  .pos-sub { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  /* Stars */
+  .stars { display: flex; gap: 4px; }
+  .star { font-size: 24px; cursor: pointer; color: var(--border-strong); user-select: none; transition: color .1s; line-height: 1; }
+  .star.on { color: #f59e0b; }
+  .star-desc { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+  /* Buttons */
+  .btn-primary { padding: 10px 24px; background: var(--blue); color: #fff; border: none; border-radius: var(--radius); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
+  .btn-primary:hover { background: #1449a0; }
+  .btn-sec { padding: 9px 18px; background: var(--surface); color: var(--text-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 13px; cursor: pointer; transition: all .15s; }
+  .btn-sec:hover { background: var(--bg); border-color: var(--border-strong); }
+  .btn-del { padding: 4px 10px; background: none; color: var(--red); border: 1px solid #f09595; border-radius: var(--radius); font-size: 11px; font-weight: 500; cursor: pointer; transition: all .15s; }
+  .btn-del:hover { background: var(--red-light); }
+  .action-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+
+  /* Trade cards */
+  .trade-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 8px; transition: border-color .15s; }
+  .trade-card:hover { border-color: var(--border-strong); }
+  .tc-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .tc-left { display: flex; flex-direction: column; gap: 5px; }
+  .tc-sym { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .tc-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+  .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .b-win { background: var(--green-light); color: var(--green); }
+  .b-loss { background: var(--red-light); color: var(--red); }
+  .b-open { background: var(--blue-light); color: var(--blue); }
+  .b-dir { background: #ede9fe; color: #5b21b6; }
+  .b-cycle { background: var(--amber-light); color: var(--amber); }
+  .tc-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--text-2); margin-top: 8px; }
+  .tc-pnl-pos { color: var(--green); font-weight: 600; }
+  .tc-pnl-neg { color: var(--red); font-weight: 600; }
+  .tc-detail { font-size: 12px; color: var(--text-2); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); line-height: 1.5; }
+
+  /* Metric cards */
+  .mcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 18px; }
+  .mlabel { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .mval { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+  .msub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .filter-bar select { font-size: 12px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); cursor: pointer; }
+  .filter-bar select:focus { outline: none; border-color: var(--blue-mid); }
+  .filter-bar .log-search { font-size: 12px; padding: 6px 10px 6px 30px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); width: 160px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239a9a94' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 9px center; }
+  .filter-bar .log-search:focus { outline: none; border-color: var(--blue-mid); box-shadow: 0 0 0 3px rgba(58,127,212,.12); }
+  .filter-bar .log-search::placeholder { color: var(--text-3); }
+  .log-clear-btn { font-size: 11px; padding: 6px 10px; background: none; color: var(--text-3); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; white-space: nowrap; }
+  .log-clear-btn:hover { color: var(--text); border-color: var(--border-strong); }
+  .filter-count { margin-left: auto; font-size: 12px; color: var(--text-3); }
+
+  /* Charts */
+  .chart-wrap { position: relative; width: 100%; }
+  .chart-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 12px; }
+  .chart-title { font-size: 12px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; }
+
+  /* Insights */
+  .insight { padding: 12px 14px; border-radius: var(--radius); margin-bottom: 8px; border-left: 3px solid; }
+  .ins-g { background: var(--green-light); border-color: var(--green); }
+  .ins-w { background: var(--amber-light); border-color: var(--amber); }
+  .ins-b { background: var(--red-light); border-color: var(--red); }
+  .ins-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .ins-g .ins-title { color: var(--green); }
+  .ins-w .ins-title { color: var(--amber); }
+  .ins-b .ins-title { color: var(--red); }
+  .ins-body { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+
+  /* Review */
+  .rv-summary { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 18px; }
+  .rv-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
+  .rv-row:last-child { border: none; }
+  .rv-val { color: var(--text-2); font-size: 12px; text-align: right; max-width: 55%; }
+  .qbox { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--blue-mid); border-radius: var(--radius); padding: 13px 16px; margin-top: 10px; }
+  .qlabel { font-size: 11px; font-weight: 600; color: var(--blue); margin-bottom: 6px; }
+  .qbox textarea { width: 100%; font-size: 13px; padding: 8px 11px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); color: var(--text); font-family: inherit; resize: vertical; min-height: 56px; line-height: 1.5; }
+  .qbox textarea:focus { outline: none; border-color: var(--blue-mid); }
+
+  /* Symbol stats table */
+  .sym-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sym-table th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .sym-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .sym-table tr:last-child td { border: none; }
+  .sym-table tr:hover td { background: var(--bg); }
+  .wr-bar-bg { width: 80px; height: 6px; background: var(--border); border-radius: 4px; display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .wr-bar-fill { height: 100%; border-radius: 4px; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
+  .empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .empty h3 { font-size: 15px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+  .empty p { font-size: 13px; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a18; color: #fff; padding: 12px 20px; border-radius: var(--radius-lg); font-size: 13px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: all .25s; pointer-events: none; z-index: 9999; }
+  .toast.show { opacity: 1; transform: none; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .sidebar-logo, .nav-item span, .sidebar-footer { display: none; }
+    .nav-item { justify-content: center; padding: 12px; }
+    .content { padding: 16px; }
+    .page-header { padding: 16px 16px 0; }
+    .g3, .g4 { grid-template-columns: 1fr 1fr; }
+    .g2 { grid-template-columns: 1fr; }
+    .pos-result { grid-template-columns: 1fr; }
+  }
+
+  .tv-int-btn { padding:3px 8px; font-size:11px; font-weight:500; background:none; color:var(--text-2); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; transition:all .12s; }
+  .tv-int-btn:hover { background:var(--bg); border-color:var(--border-strong); }
+  .tv-int-btn.tv-int-active { background:var(--blue-light); color:var(--blue); border-color:var(--blue-mid); font-weight:600; }
+
+  .exit-form { margin-top: 12px; padding: 14px 16px; background: var(--blue-light); border: 1px solid #b5d4f4; border-radius: var(--radius-lg); }
+  .exit-form-title { font-size: 12px; font-weight: 700; color: var(--blue); margin-bottom: 10px; letter-spacing: 0.02em; }
+  .exit-form .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .exit-form .field label { color: var(--blue); }
+  .exit-form .field input, .exit-form .field select { background: var(--surface); border-color: #b5d4f4; font-size: 13px; }
+  .exit-form-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .btn-exit-save { padding: 8px 18px; background: var(--blue); color: #fff; border: none; border-radius: var(--radius); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn-exit-save:hover { background: #1449a0; }
+  .btn-exit-cancel { padding: 7px 14px; background: none; color: var(--text-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: 12px; cursor: pointer; }
+  .btn-exit-cancel:hover { background: rgba(0,0,0,.04); }
+  .btn-fill-exit { padding: 5px 11px; background: var(--blue-light); color: var(--blue); border: 1px solid #b5d4f4; border-radius: var(--radius); font-size: 11px; font-weight: 600; cursor: pointer; transition: all .15s; }
+  .btn-fill-exit:hover { background: #d0e7f8; }
+
+  /* Watchlist */
+  .watch-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 13px 16px; margin-bottom: 8px; }
+  .watch-card:hover { border-color: var(--border-strong); }
+  .watch-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .watch-sym { font-size: 16px; font-weight: 700; }
+  .watch-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+  .watch-meta { font-size: 12px; color: var(--text-2); margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .watch-reason { font-size: 12px; color: var(--text-2); margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); line-height: 1.5; }
+  .watch-actions { display: flex; gap: 6px; }
+  .btn-promote { padding: 5px 11px; background: var(--green-light); color: var(--green); border: 1px solid #8fcc9b; border-radius: var(--radius); font-size: 11px; font-weight: 600; cursor: pointer; }
+  .btn-promote:hover { background: #d0edda; }
+  .b-hi { background: #fde8e8; color: #c0291e; }
+  .b-mi { background: #fdf3e3; color: #b06010; }
+  .b-lo { background: var(--bg); color: var(--text-3); border: 1px solid var(--border); }
+  /* Analysis result cards */
+  .an-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 18px; margin-bottom: 8px; }
+  .an-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .an-sym { font-size: 16px; font-weight: 700; }
+  .an-stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-top: 10px; }
+  .an-stat { background: var(--bg); border-radius: var(--radius); padding: 8px 12px; }
+  .an-stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); margin-bottom: 3px; }
+  .an-stat-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .an-trades { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  .an-trade-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; color: var(--text-2); border-bottom: 1px solid var(--border); }
+  .an-trade-row:last-child { border: none; }
+  .an-summary-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .an-pill { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+  /* PIN Lock */
+  .pin-overlay { position:fixed; inset:0; background:#f7f7f5; z-index:9999; display:flex; align-items:center; justify-content:center; }
+  .pin-box { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:40px 36px; width:320px; text-align:center; box-shadow:0 4px 32px rgba(0,0,0,.08); }
+  .pin-logo { font-size:11px; font-weight:700; letter-spacing:.12em; color:var(--blue); text-transform:uppercase; margin-bottom:8px; }
+  .pin-title { font-size:20px; font-weight:700; margin-bottom:6px; }
+  .pin-sub { font-size:12px; color:var(--text-2); margin-bottom:28px; line-height:1.5; }
+  .pin-dots { display:flex; justify-content:center; gap:12px; margin-bottom:24px; }
+  .pin-dot { width:14px; height:14px; border-radius:50%; border:2px solid var(--border); background:transparent; transition:all .15s; }
+  .pin-dot.filled { background:var(--blue); border-color:var(--blue); }
+  .pin-dot.error { background:var(--red); border-color:var(--red); }
+  .pin-pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+  .pin-key { padding:14px; font-size:18px; font-weight:600; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); cursor:pointer; transition:all .12s; user-select:none; }
+  .pin-key:hover { background:var(--bg); border-color:var(--border-strong); }
+  .pin-key:active { transform:scale(.95); }
+  .pin-key.del { font-size:14px; color:var(--text-2); }
+  .pin-key.empty { border:none; background:none; cursor:default; }
+  .pin-error { font-size:12px; color:var(--red); margin-top:4px; min-height:18px; }
+  .pin-setup-hint { font-size:11px; color:var(--text-3); margin-top:12px; line-height:1.5; }
+  .pin-change-link { font-size:11px; color:var(--blue); cursor:pointer; margin-top:10px; display:inline-block; }
+  .pin-change-link:hover { text-decoration:underline; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">Trade Journal</div>
+      <h1>專業交易紀錄</h1>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="sw('log')" data-page="log">
+        <span class="nav-icon">📋</span><span>交易日誌</span>
+      </div>
+      <div class="nav-item" onclick="sw('review')" data-page="review">
+        <span class="nav-icon">🔍</span><span>覆盤筆記</span>
+      </div>
+      <div class="nav-item" onclick="sw('stats')" data-page="stats">
+        <span class="nav-icon">📊</span><span>績效統計</span>
+      </div>
+      <div class="nav-item" onclick="sw('calc')" data-page="calc">
+        <span class="nav-icon">🧮</span><span>倉位計算</span>
+      </div>
+      <div class="nav-item" onclick="sw('symbols')" data-page="symbols">
+        <span class="nav-icon">🔎</span><span>選股器</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div style="margin-bottom:8px;color:var(--text-3)">資料儲存於本地瀏覽器</div>
+      <button onclick="loadDemo()" style="width:100%;padding:7px;font-size:11px;font-weight:600;background:var(--blue-light);color:var(--blue);border:1px solid #b5d4f4;border-radius:var(--radius);cursor:pointer;margin-bottom:4px">載入範本資料</button>
+      <button onclick="clearDemo()" style="width:100%;padding:7px;font-size:11px;font-weight:600;background:none;color:var(--text-3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer">清除所有資料</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- ===== 交易日誌 ===== -->
+    <div id="page-log" class="panel active">
+      <div class="page-header">
+        <div class="page-header-text">
+          <h2>交易日誌</h2>
+          <p>出場後在卡片上補填出場紀錄</p>
+        </div>
+        <div class="page-header-actions">
+          <button class="btn-primary" onclick="toggleNewTrade()" id="btn-new-trade" style="padding:8px 18px;font-size:13px">＋ 新增交易</button>
+        </div>
+      </div>
+      <div class="content">
+
+        <!-- 新增交易表單（收合） -->
+        <div id="new-trade-wrap" style="display:none;margin-bottom:20px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px 24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+              <div>
+                <div style="font-size:15px;font-weight:700">新增交易紀錄</div>
+                <div style="font-size:12px;color:var(--text-2);margin-top:2px">進場前完成模塊一至二，出場後補填模塊三至四</div>
+              </div>
+              <button onclick="toggleNewTrade()" style="padding:5px 12px;background:none;color:var(--text-3);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;cursor:pointer">✕ 收起</button>
+            </div>
+
+            <div class="mod-row" style="margin-top:0">
+              <span class="mod-chip">模塊一</span>
+              <span class="mod-title">交易基本資訊</span>
+              <span class="mod-hint">基礎數據 — 勝率與期望值統計依據</span>
+            </div>
+            <div class="g3">
+              <div class="field"><label>標的代號 / 名稱</label><input id="f-sym" type="text" placeholder="2330 / 台積電"></div>
+              <div class="field"><label>交易日期</label><input id="f-date" type="date"></div>
+              <div class="field"><label>交易方向</label>
+                <select id="f-dir">
+                  <option value="long_cash">現股作多</option>
+                  <option value="long_margin">融資作多</option>
+                  <option value="short">借券作空</option>
+                  <option value="option_call">選擇權 Call</option>
+                  <option value="option_put">選擇權 Put</option>
+                  <option value="futures">期貨</option>
+                </select>
+              </div>
+            </div>
+            <div class="g2 mt8">
+              <div class="field"><label>交易週期</label>
+                <select id="f-cycle">
+                  <option value="intraday">當沖（當日出清）</option>
+                  <option value="swing1">隔日沖</option>
+                  <option value="swing_short">短波段（數天〜2週）</option>
+                  <option value="mid_long">中長線（數月）</option>
+                </select>
+              </div>
+              <div class="field"><label>持股數量（股 / 口）</label><input id="f-qty" type="number" placeholder="1000" oninput="calcAll()"></div>
+            </div>
+
+            <div class="mod-row">
+              <span class="mod-chip">模塊二</span>
+              <span class="mod-title">進場決策還原</span>
+              <span class="mod-hint">量化進場理由 — 未來驗證依據</span>
+            </div>
+            <div class="g3">
+              <div class="field"><label>進場時間</label><input id="f-time" type="time"></div>
+              <div class="field"><label>進場價格</label><input id="f-entry" type="number" step="0.01" placeholder="0.00" oninput="calcAll()"></div>
+              <div class="field"><label>策略框架</label>
+                <select id="f-strategy">
+                  <option value="">選擇策略...</option>
+                  <option value="trend">趨勢追蹤（均線排列）</option>
+                  <option value="breakout">突破平台 / 箱形整理</option>
+                  <option value="pullback">回測均線進場</option>
+                  <option value="reversal">超跌反彈 / 背離</option>
+                  <option value="vol_first">爆量第一根</option>
+                  <option value="sector">族群輪動領頭股</option>
+                  <option value="fundamental">基本面 / 價值型</option>
+                </select>
+              </div>
+            </div>
+            <div class="mt8">
+              <div class="field"><label>技術面訊號（可複選）</label>
+                <div class="pills mt8" id="tech-pills">
+                  <span class="pill" onclick="tog(this)">突破平台</span>
+                  <span class="pill" onclick="tog(this)">回測20MA</span>
+                  <span class="pill" onclick="tog(this)">回測60MA</span>
+                  <span class="pill" onclick="tog(this)">爆量第一根</span>
+                  <span class="pill" onclick="tog(this)">KD黃金交叉</span>
+                  <span class="pill" onclick="tog(this)">MACD黃金交叉</span>
+                  <span class="pill" onclick="tog(this)">乖離過大反彈</span>
+                  <span class="pill" onclick="tog(this)">RSI超賣</span>
+                  <span class="pill" onclick="tog(this)">週線支撐</span>
+                  <span class="pill" onclick="tog(this)">月線支撐</span>
+                </div>
+              </div>
+            </div>
+            <div class="mt8">
+              <div class="field"><label>籌碼面訊號（可複選）</label>
+                <div class="pills mt8" id="chip-pills">
+                  <span class="pill chip" onclick="tog(this,'chip')">外資連買</span>
+                  <span class="pill chip" onclick="tog(this,'chip')">投信連買</span>
+                  <span class="pill chip" onclick="tog(this,'chip')">主力分點佈局</span>
+                  <span class="pill chip" onclick="tog(this,'chip')">大戶持股上升</span>
+                  <span class="pill chip" onclick="tog(this,'chip')">融券大增（軋空）</span>
+                  <span class="pill chip" onclick="tog(this,'chip')">法人三買齊買</span>
+                </div>
+              </div>
+            </div>
+            <div class="mt8">
+              <div class="field"><label>基本 / 消息面訊號（可複選）</label>
+                <div class="pills mt8" id="fund-pills">
+                  <span class="pill fund" onclick="tog(this,'fund')">營收創新高</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">產業轉折點</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">法說會利多</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">EPS年增率加速</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">高殖利率</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">低本益比</span>
+                  <span class="pill fund" onclick="tog(this,'fund')">股票回購</span>
+                </div>
+              </div>
+            </div>
+            <div class="field mt12"><label>進場理由具體描述</label>
+              <textarea id="f-reason" placeholder="例：日線突破前高50.5元，成交量達均量1.8倍，外資連續3日買超，族群內XXX已先漲15%，大盤站上月線..."></textarea>
+            </div>
+            <div class="g3 mt8">
+              <div class="field"><label>計畫停損價格（進場前必填）</label><input id="f-sl" type="number" step="0.01" placeholder="絕對不可進場後才想" oninput="calcAll()"></div>
+              <div class="field"><label>計畫目標價格</label><input id="f-tp" type="number" step="0.01" placeholder="停利點" oninput="calcAll()"></div>
+              <div class="field"><label>停損幅度</label><input id="f-sl-pct" type="text" readonly placeholder="自動計算"></div>
+            </div>
+            <div id="rr-box" class="rr-box">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">風報比 R:R</div>
+                <div class="rr-num" id="rr-val" style="color:var(--text-3)">— : —</div>
+              </div>
+              <div class="rr-info">
+                <div class="rr-verdict" id="rr-verdict" style="color:var(--text-3)">填入進場、停損、目標價後自動計算</div>
+                <div class="rr-rule">資深經理人原則：風報比低於 1:2 的單不接</div>
+              </div>
+            </div>
+
+            <div class="mod-row">
+              <span class="mod-chip">模塊三</span>
+              <span class="mod-title">出場執行紀錄</span>
+              <span class="mod-hint">已出場才填 — 驗證知行合一</span>
+            </div>
+            <div class="g3">
+              <div class="field"><label>出場日期</label><input id="f-exit-date" type="date"></div>
+              <div class="field"><label>出場價格（留空＝持有中）</label><input id="f-exit" type="number" step="0.01" placeholder="持有中留空" oninput="calcAll()"></div>
+              <div class="field"><label>實際損益（元）</label><input id="f-pnl-display" type="text" readonly placeholder="自動計算"></div>
+            </div>
+            <div class="field mt8"><label>出場理由</label>
+              <select id="f-exit-reason">
+                <option value="">選擇出場理由...</option>
+                <option value="sl_hit">觸及既定停損（紀律執行）</option>
+                <option value="tp_hit">達到既定停利目標</option>
+                <option value="trail_stop">移動停利（如跌破5日線）</option>
+                <option value="fund_bad">基本面轉壞</option>
+                <option value="time_stop">時間停損（盤整太久）</option>
+                <option value="market_change">大盤環境轉差</option>
+                <option value="forced">非計畫性出場（情緒）</option>
+              </select>
+            </div>
+
+            <div class="mod-row">
+              <span class="mod-chip">模塊四</span>
+              <span class="mod-title">交易心理與紀律評級</span>
+              <span class="mod-hint">點數評分 — 抽離主觀的關鍵</span>
+            </div>
+            <div class="g2">
+              <div class="field"><label>進場前心理狀態</label>
+                <select id="f-emotion">
+                  <option value="calm">平靜自信</option>
+                  <option value="confident">積極有把握</option>
+                  <option value="anxious">焦慮、恐懼錯過</option>
+                  <option value="fomo">FOMO（怕錯過追高）</option>
+                  <option value="revenge">報復性交易（想翻本）</option>
+                  <option value="hesitant">猶豫不決</option>
+                </select>
+              </div>
+              <div class="field"><label>當時大盤環境</label>
+                <select id="f-market">
+                  <option value="bull">多頭排列（均線向上發散）</option>
+                  <option value="bear">空頭波段（均線向下）</option>
+                  <option value="range">大箱型盤整（來回震盪）</option>
+                  <option value="volatile">高度震盪（VIX偏高）</option>
+                  <option value="recovery">底部反彈初期</option>
+                </select>
+              </div>
+            </div>
+            <div class="mt12">
+              <div style="font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.03em;margin-bottom:6px">紀律執行度（1–5 分）</div>
+              <div class="stars" id="disc-stars">
+                <span class="star on" onclick="setDisc(1)">★</span>
+                <span class="star on" onclick="setDisc(2)">★</span>
+                <span class="star on" onclick="setDisc(3)">★</span>
+                <span class="star" onclick="setDisc(4)">★</span>
+                <span class="star" onclick="setDisc(5)">★</span>
+              </div>
+              <div class="star-desc" id="disc-desc">3分 — 部分按計畫，小幅調整</div>
+            </div>
+            <div class="field mt12"><label>備註（盤中觀察 / 任何想補充的）</label>
+              <textarea id="f-notes" placeholder="例：盤中出現異常大量，研判是主力洗盤，當時有恐慌感差點提前出場..."></textarea>
+            </div>
+
+            <div class="action-row">
+              <button class="btn-sec" onclick="clearForm()">清除</button>
+              <button class="btn-primary" onclick="saveTrade()">儲存交易紀錄</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 篩選列 -->
+        <div class="filter-bar">
+          <input class="log-search" id="fl-search" type="text" placeholder="搜尋代碼 / 名稱" oninput="renderLog()">
+          <select id="fl-result" onchange="renderLog()">
+            <option value="all">全部結果</option><option value="win">獲利</option><option value="loss">虧損</option><option value="open">持有中</option>
+          </select>
+          <select id="fl-cycle" onchange="renderLog()">
+            <option value="all">全部週期</option><option value="intraday">當沖</option><option value="swing1">隔日沖</option><option value="swing_short">短波段</option><option value="mid_long">中長線</option>
+          </select>
+          <select id="fl-dir" onchange="renderLog()">
+            <option value="all">全部方向</option><option value="long_cash">現股多</option><option value="long_margin">融資多</option><option value="short">借券空</option>
+          </select>
+          <select id="fl-strategy" onchange="renderLog()">
+            <option value="all">全部策略</option>
+            <option value="trend">趨勢追蹤</option><option value="breakout">突破平台</option><option value="pullback">回測均線</option>
+            <option value="reversal">超跌反彈</option><option value="vol_first">爆量第一根</option><option value="sector">族群輪動</option><option value="fundamental">基本面</option>
+          </select>
+          <button class="log-clear-btn" onclick="clearLogFilters()">清除篩選</button>
+          <span class="filter-count" id="log-count"></span>
+        </div>
+        <div id="log-list"></div>
+      </div>
+    </div>
+
+    <!-- ===== 覆盤筆記 ===== -->
+    <div id="page-review" class="panel">
+      <div class="page-header">
+        <div class="page-header-text"><h2>覆盤筆記</h2><p>出場後24小時內完成，三個問題是最重要的學習養分</p></div>
+      </div>
+      <div class="content">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;max-width:700px">
+          <div class="field" style="flex:1;min-width:180px">
+            <label>搜尋股票代碼 / 名稱</label>
+            <input id="rv-search" type="text" placeholder="輸入代號篩選，例如 2330" oninput="filterRvList()">
+          </div>
+          <div class="field" style="flex:2;min-width:220px">
+            <label>選擇要覆盤的交易</label>
+            <select id="rv-sel" onchange="loadReview()">
+              <option value="">— 選擇交易 —</option>
+            </select>
+          </div>
+        </div>
+        <div id="rv-content" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <!-- ===== 績效統計 ===== -->
+    <div id="page-stats" class="panel">
+      <div class="page-header">
+        <div class="page-header-text"><h2>績效統計</h2><p>累積20筆以上，數字才開始說話</p></div>
+      </div>
+      <div class="content">
+        <div class="g4" id="st-metrics" style="margin-bottom:16px"></div>
+        <div id="st-charts"></div>
+        <div id="st-insights" style="margin-top:16px"></div>
+      </div>
+    </div>
+
+    <!-- ===== 倉位計算 ===== -->
+    <div id="page-calc" class="panel">
+      <div class="page-header">
+        <div class="page-header-text"><h2>倉位計算器</h2><p>進場前先算，從「總資金與最大損失」反推應買幾張，而不是憑感覺</p></div>
+      </div>
+      <div class="content">
+        <div class="g2">
+          <div>
+            <div class="mod-row" style="margin-top:0">
+              <span class="mod-chip">輸入</span>
+              <span class="mod-title">帳戶與風險參數</span>
+            </div>
+            <div class="field"><label>帳戶總資金（元）</label><input id="c-capital" type="number" placeholder="1,000,000" oninput="calcPos()"></div>
+            <div class="field mt8"><label>單筆最大損失比例（%）</label><input id="c-risk-pct" type="number" step="0.1" value="2" placeholder="建議 1~2%" oninput="calcPos()">
+              <div class="field-note">資深經理人原則：單筆最大損失不超過總資金2%</div>
+            </div>
+            <div class="mod-row">
+              <span class="mod-chip">這筆交易</span>
+              <span class="mod-title">價格參數</span>
+            </div>
+            <div class="field"><label>進場價格（元）</label><input id="c-entry" type="number" step="0.01" placeholder="0.00" oninput="calcPos()"></div>
+            <div class="field mt8"><label>停損價格（元）</label><input id="c-sl" type="number" step="0.01" placeholder="0.00" oninput="calcPos()"></div>
+            <div class="field mt8"><label>目標價格（元）</label><input id="c-tp" type="number" step="0.01" placeholder="0.00" oninput="calcPos()"></div>
+            <div class="field mt8"><label>每張股數（一般股票填1000）</label><input id="c-lot" type="number" value="1000" oninput="calcPos()"></div>
+          </div>
+          <div>
+            <div class="mod-row" style="margin-top:0">
+              <span class="mod-chip">計算結果</span>
+              <span class="mod-title">建議倉位</span>
+            </div>
+            <div class="pos-box">
+              <div style="font-size:12px;color:#1a5fa8;font-weight:600;margin-bottom:2px">最大允許虧損</div>
+              <div style="font-size:28px;font-weight:800;color:#1a5fa8;font-variant-numeric:tabular-nums" id="c-max-loss">—</div>
+              <div class="pos-result">
+                <div class="pos-item">
+                  <div class="pos-label">建議張數</div>
+                  <div class="pos-val" id="c-lots">—</div>
+                  <div class="pos-sub">張（不超過此數）</div>
+                </div>
+                <div class="pos-item">
+                  <div class="pos-label">需要資金</div>
+                  <div class="pos-val" id="c-cost">—</div>
+                  <div class="pos-sub">元</div>
+                </div>
+                <div class="pos-item">
+                  <div class="pos-label">風報比</div>
+                  <div class="pos-val" id="c-rr">—</div>
+                  <div class="pos-sub" id="c-rr-verdict">—</div>
+                </div>
+              </div>
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(26,95,168,.2)">
+                <div style="font-size:11px;color:#1a5fa8;font-weight:600;margin-bottom:4px">最大獲利（達目標價）</div>
+                <div style="font-size:16px;font-weight:700;color:#2a7a3a;font-variant-numeric:tabular-nums" id="c-max-profit">—</div>
+              </div>
+            </div>
+            <div id="c-warning" style="margin-top:12px;padding:12px 14px;border-radius:var(--radius);background:var(--red-light);border-left:3px solid var(--red);font-size:12px;color:var(--red);display:none"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 選股器 ===== -->
+    <div id="page-symbols" class="panel">
+      <div class="page-header">
+        <div class="page-header-text"><h2>選股器</h2><p>觀察名單 — 追蹤潛在標的，條件成熟再轉成交易　·　歷史勝率分析 — 從紀錄找出你的拿手股與剋星股</p></div>
+      </div>
+      <div class="content">
+
+        <!-- 方向二：觀察名單 -->
+        <div class="mod-row" style="margin-top:0">
+          <span class="mod-chip">觀察名單</span>
+          <span class="mod-title">潛力標的等待室</span>
+          <span class="mod-hint">條件未到不進場，先記錄，等訊號</span>
+          <button class="btn-primary" onclick="openWatchForm()" style="margin-left:12px;padding:6px 14px;font-size:12px">＋ 新增觀察</button>
+        </div>
+        <div id="watch-form-wrap" style="display:none;margin-bottom:16px">
+          <div style="background:var(--blue-light);border:1px solid #b5d4f4;border-radius:var(--radius-lg);padding:16px 18px">
+            <div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:12px">新增觀察標的</div>
+            <div class="g3">
+              <div class="field"><label>股票代號 / 名稱</label><input id="w-sym" type="text" placeholder="2330 / 台積電"></div>
+              <div class="field"><label>觀察策略</label>
+                <select id="w-strategy">
+                  <option value="">選擇策略...</option>
+                  <option value="trend">趨勢追蹤</option>
+                  <option value="breakout">突破平台</option>
+                  <option value="pullback">回測均線</option>
+                  <option value="reversal">超跌反彈</option>
+                  <option value="vol_first">爆量第一根</option>
+                  <option value="sector">族群輪動</option>
+                  <option value="fundamental">基本面</option>
+                </select>
+              </div>
+              <div class="field"><label>優先程度</label>
+                <select id="w-priority">
+                  <option value="high">🔴 高 — 接近進場</option>
+                  <option value="mid">🟡 中 — 持續追蹤</option>
+                  <option value="low">⚪ 低 — 長線關注</option>
+                </select>
+              </div>
+            </div>
+            <div class="g3 mt8">
+              <div class="field"><label>理想進場價位（區間）</label><input id="w-entry-range" type="text" placeholder="例：920～940"></div>
+              <div class="field"><label>進場觸發條件</label><input id="w-trigger" type="text" placeholder="例：突破960且量＞1.5萬張"></div>
+              <div class="field"><label>加入觀察日期</label><input id="w-date" type="date"></div>
+            </div>
+            <div class="field mt8"><label>觀察理由（為什麼這檔值得追蹤）</label>
+              <textarea id="w-reason" placeholder="例：AI伺服器族群輪動，外資連續買超，但目前位置偏高，等回測20MA且量縮後再考慮進場..."></textarea>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+              <button class="btn-sec" onclick="closeWatchForm()">取消</button>
+              <button class="btn-primary" onclick="saveWatch()">加入觀察名單</button>
+            </div>
+          </div>
+        </div>
+        <div id="watch-list"></div>
+
+        <!-- 方向一：歷史勝率分析 -->
+        <div class="mod-row" style="margin-top:28px">
+          <span class="mod-chip">歷史分析</span>
+          <span class="mod-title">從交易紀錄找出你的模式</span>
+          <span class="mod-hint">樣本 ≥ 3筆才有參考意義</span>
+        </div>
+
+        <!-- 條件篩選器 -->
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">篩選條件（可組合）</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+            <div class="field" style="min-width:130px">
+              <label>策略框架</label>
+              <select id="an-strategy" onchange="renderSymbols()">
+                <option value="all">全部策略</option>
+                <option value="trend">趨勢追蹤</option>
+                <option value="breakout">突破平台</option>
+                <option value="pullback">回測均線</option>
+                <option value="reversal">超跌反彈</option>
+                <option value="vol_first">爆量第一根</option>
+                <option value="sector">族群輪動</option>
+                <option value="fundamental">基本面</option>
+              </select>
+            </div>
+            <div class="field" style="min-width:120px">
+              <label>交易週期</label>
+              <select id="an-cycle" onchange="renderSymbols()">
+                <option value="all">全部週期</option>
+                <option value="intraday">當沖</option>
+                <option value="swing1">隔日沖</option>
+                <option value="swing_short">短波段</option>
+                <option value="mid_long">中長線</option>
+              </select>
+            </div>
+            <div class="field" style="min-width:120px">
+              <label>大盤環境</label>
+              <select id="an-market" onchange="renderSymbols()">
+                <option value="all">全部環境</option>
+                <option value="bull">多頭排列</option>
+                <option value="bear">空頭波段</option>
+                <option value="range">箱型盤整</option>
+                <option value="volatile">高度震盪</option>
+                <option value="recovery">底部反彈</option>
+              </select>
+            </div>
+            <div class="field" style="min-width:110px">
+              <label>紀律門檻</label>
+              <select id="an-disc" onchange="renderSymbols()">
+                <option value="all">不限</option>
+                <option value="3">≥ 3分</option>
+                <option value="4">≥ 4分</option>
+                <option value="5">5分（完美）</option>
+              </select>
+            </div>
+            <div class="field" style="min-width:120px">
+              <label>進場情緒</label>
+              <select id="an-emotion" onchange="renderSymbols()">
+                <option value="all">不限</option>
+                <option value="calm">平靜自信</option>
+                <option value="confident">積極有把握</option>
+                <option value="fomo">FOMO</option>
+                <option value="revenge">報復交易</option>
+              </select>
+            </div>
+            <button class="log-clear-btn" onclick="resetAnalysis()">重設</button>
+          </div>
+        </div>
+
+        <div id="sym-content"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let trades = JSON.parse(localStorage.getItem('proJournal2') || '[]');
+let discScore = 3;
+function save(){ localStorage.setItem('proJournal2', JSON.stringify(trades)); }
+
+// ── Demo data ──
+const DEMO_KEY = 'proJournal2_demo';
+function loadDemo() {
+  const demo = [
+    { id:1700000001000, sym:'2330', date:'2025-01-08', time:'09:35', dir:'long_cash', cycle:'swing_short', entry:940, sl:910, tp:1010, qty:2000, exit:1005, exitDate:'2025-01-15', exitReason:'tp_hit', pnl:130000, pct:6.91, strategy:'breakout', techSigs:['突破平台','成交量放大'], chipSigs:['外資連買','投信連買'], fundSigs:[], reason:'週線突破整理區，外資連續5日買超，量增價漲，族群AI伺服器同步走強。', emotion:'calm', market:'bull', discScore:5, notes:'完全按計畫執行，進場後回踩確認站穩，達目標價出場。', review:{ q1:'會，進場點就在突破確認後的第一根，位置合理。', q2:'這筆是計畫內的波段，策略完全奏效，不是運氣。', q3:'N/A（獲利單）', lesson:'突破後量縮回踩再進，是更安全的進場方式，下次可試。', next:'等下次週線整理突破，外資籌碼再度堆疊時，同樣操作。' } },
+    { id:1700000002000, sym:'2454', date:'2025-01-10', time:'10:15', dir:'long_cash', cycle:'swing_short', entry:1050, sl:1010, tp:1130, qty:1000, exit:1015, exitDate:'2025-01-13', exitReason:'sl_hit', pnl:-35000, pct:-3.33, strategy:'pullback', techSigs:['回測20MA','KD黃金交叉'], chipSigs:['主力分點佈局'], fundSigs:['法說會利多'], reason:'法說會後回測20MA，KD底部交叉，預期反彈。', emotion:'confident', market:'bull', discScore:4, notes:'進場後大盤突然轉弱，20MA未能守住，停損執行。', review:{ q1:'不確定，當時大盤訊號已有轉弱跡象，應等更明確的止穩再進。', q2:'N/A（虧損單）', q3:'進場點在法說後急跌的反彈，屬末升段高點往下的第一反彈，位置偏高。', lesson:'法說利多後如果股價不漲反跌，是主力出貨訊號，不應逆勢接刀。', next:'等股價跌破前低後再觀察是否有量縮止跌K，再考慮進場。' } },
+    { id:1700000003000, sym:'2317', date:'2025-01-15', time:'09:10', dir:'long_cash', cycle:'swing_short', entry:198, sl:192, tp:215, qty:5000, exit:212, exitDate:'2025-01-24', exitReason:'trail_stop', pnl:70000, pct:7.07, strategy:'trend', techSigs:['突破平台','回測20MA'], chipSigs:['外資連買','大戶持股上升'], fundSigs:['EPS年增率加速'], reason:'月線多頭排列，日線突破前波整理高點198，外資連10日買超，AI族群輪動效應。', emotion:'calm', market:'bull', discScore:5, notes:'跌破5日線後啟動移動停利，保住大部分獲利。', review:null },
+    { id:1700000004000, sym:'2330', date:'2025-01-20', time:'13:30', dir:'long_cash', cycle:'intraday', entry:970, sl:962, tp:985, qty:1000, exit:966, exitDate:'2025-01-20', exitReason:'sl_hit', pnl:-4000, pct:-0.41, strategy:'breakout', techSigs:['突破平台'], chipSigs:[], fundSigs:[], reason:'盤中突破平台，預期延伸漲勢。', emotion:'fomo', market:'bull', discScore:2, notes:'其實是追漲，盤中看到拉升就衝進去，沒有等回踩確認，停損很快就觸發。', review:{ q1:'不會，這是FOMO追高，沒有等回踩確認，進場點不理想。', q2:'N/A（虧損單）', q3:'進場在盤中急拉後的高點，是末升段。', lesson:'當沖如果沒有在開盤前就規劃好，盤中不要臨時追單，尤其已經有持倉的情況下。', next:'下次當沖須在開盤前30分鐘就選好標的和價位，不臨時起意。' } },
+    { id:1700000005000, sym:'6669', date:'2025-02-03', time:'09:30', dir:'long_cash', cycle:'swing_short', entry:420, sl:405, tp:460, qty:3000, exit:458, exitDate:'2025-02-14', exitReason:'tp_hit', pnl:114000, pct:9.05, strategy:'sector', techSigs:['突破平台','爆量第一根'], chipSigs:['投信連買','法人三買齊買'], fundSigs:['營收創新高'], reason:'緯穎1月營收創歷史新高，族群輪動至AI散熱概念，爆量突破前高，三大法人齊買。', emotion:'confident', market:'bull', discScore:5, notes:'完美案例，族群領頭股＋法人籌碼＋技術突破三者共振。', review:null },
+    { id:1700000006000, sym:'3711', date:'2025-02-10', time:'10:45', dir:'long_cash', cycle:'swing_short', entry:580, sl:558, tp:630, qty:1000, exit:562, exitDate:'2025-02-13', exitReason:'sl_hit', pnl:-18000, pct:-3.10, strategy:'pullback', techSigs:['回測60MA','RSI超賣'], chipSigs:['外資連買'], fundSigs:[], reason:'回測60日均線，RSI跌至35，預期超跌反彈。', emotion:'anxious', market:'range', discScore:3, notes:'大盤盤整中勉強進場，心態不夠平靜，停損後懊悔。', review:null },
+    { id:1700000007000, sym:'2330', date:'2025-02-18', time:'09:20', dir:'long_cash', cycle:'mid_long', entry:955, sl:920, tp:1050, qty:3000, exit:null, exitDate:'', exitReason:'', pnl:null, pct:null, strategy:'trend', techSigs:['回測20MA','週線支撐'], chipSigs:['外資連買','投信連買'], fundSigs:['EPS年增率加速','法說會利多'], reason:'季線支撐反彈，AI需求超預期，法說下調保守，本益比回到合理區間，中長線佈局時機。', emotion:'calm', market:'bull', discScore:5, notes:'這筆打算持有到年底，目標1050不急。', review:null },
+    { id:1700000008000, sym:'2454', date:'2025-02-20', time:'14:00', dir:'long_cash', cycle:'swing_short', entry:1020, sl:995, tp:1090, qty:1000, exit:990, exitDate:'2025-02-25', exitReason:'sl_hit', pnl:-30000, pct:-2.94, strategy:'reversal', techSigs:['乖離過大反彈','RSI超賣'], chipSigs:[], fundSigs:[], reason:'大跌後RSI接近30，乖離-12%，預期技術反彈。', emotion:'revenge', market:'bear', discScore:1, notes:'前一筆2454也是虧損，這次是想翻本而進場，完全是報復性交易。', review:{ q1:'不會。當時是報復性交易，心態完全不對，進場沒有依據。', q2:'N/A（虧損單）', q3:'在下跌趨勢中接刀，沒有止跌訊號就進場，非常危險。', lesson:'同一標的連續虧損後，強制冷靜至少3個交易日，再重新評估，絕對不能報復性交易。', next:'等到2454出現週線止跌訊號，且大盤同步企穩，再重新評估做多機會。' } },
+    { id:1700000009000, sym:'2881', date:'2025-03-03', time:'09:05', dir:'long_cash', cycle:'mid_long', entry:88, sl:84, tp:98, qty:10000, exit:96, exitDate:'2025-04-10', exitReason:'trail_stop', pnl:80000, pct:9.09, strategy:'fundamental', techSigs:['突破平台','月線支撐'], chipSigs:['外資連買'], fundSigs:['高殖利率','低本益比'], reason:'金融股殖利率約6%，本益比偏低，月線突破，預期升息循環後段受惠。', emotion:'calm', market:'range', discScore:4, notes:'中長線佈局，耐心等到移動停利啟動。', review:null },
+    { id:1700000010000, sym:'2317', date:'2025-03-10', time:'10:30', dir:'long_cash', cycle:'swing_short', entry:205, sl:199, tp:222, qty:3000, exit:220, exitDate:'2025-03-20', exitReason:'tp_hit', pnl:45000, pct:7.32, strategy:'trend', techSigs:['突破平台','回測20MA'], chipSigs:['外資連買','投信連買'], fundSigs:['EPS年增率加速'], reason:'季線多頭排列，突破前高整理，外資持續買超，AI伺服器出貨動能強勁。', emotion:'confident', market:'bull', discScore:5, notes:'', review:null },
+    { id:1700000011000, sym:'6669', date:'2025-03-15', time:'09:15', dir:'long_cash', cycle:'swing_short', entry:445, sl:430, tp:480, qty:2000, exit:433, exitDate:'2025-03-19', exitReason:'sl_hit', pnl:-24000, pct:-2.70, strategy:'pullback', techSigs:['回測20MA'], chipSigs:['投信連買'], fundSigs:[], reason:'回測20日均線，投信持續買超。', emotion:'calm', market:'volatile', discScore:4, notes:'大盤突然轉弱，20MA失守，停損執行無情緒。', review:null },
+    { id:1700000012000, sym:'2330', date:'2025-03-25', time:'09:00', dir:'long_cash', cycle:'swing_short', entry:960, sl:935, tp:1020, qty:2000, exit:1018, exitDate:'2025-04-05', exitReason:'tp_hit', pnl:116000, pct:6.04, strategy:'breakout', techSigs:['突破平台','爆量第一根'], chipSigs:['外資連買','大戶持股上升'], fundSigs:['法說會利多'], reason:'突破月線壓力，外資同步大買，法說引導Q2需求強勁。', emotion:'confident', market:'bull', discScore:5, notes:'台積電本來就是最熟悉的標的，這次操作非常順暢。', review:null },
+  ];
+  trades = demo;
+  save();
+  localStorage.setItem(DEMO_KEY, '1');
+  renderLog();
+  sw('log');
+  toast('✓ 已載入 12 筆範本資料');
+}
+function clearDemo() {
+  if (!confirm('確定清除所有範本資料？')) return;
+  trades = [];
+  save();
+  localStorage.removeItem(DEMO_KEY);
+  renderLog();
+  toast('✓ 已清除範本資料');
+}
+const isDemo = localStorage.getItem(DEMO_KEY) === '1';
+
+// ── Init ──
+document.getElementById('f-date').valueAsDate = new Date();
+
+// ── Navigation ──
+function sw(name) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.page === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  if (name === 'log') { renderLog(); }
+  if (name === 'review') renderRvSel();
+  if (name === 'stats') renderStats();
+  if (name === 'symbols') renderSymbols();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ── Pill toggles ──
+function tog(el, type) {
+  el.classList.toggle('on');
+  if (type) {
+    if (el.classList.contains('on')) el.classList.add(type);
+    else el.classList.remove(type);
+  }
+}
+function getChips(id) {
+  return Array.from(document.querySelectorAll('#' + id + ' .pill.on')).map(el => el.textContent);
+}
+
+// ── Disc stars ──
+function setDisc(n) {
+  discScore = n;
+  document.querySelectorAll('#disc-stars .star').forEach((s, i) => s.classList.toggle('on', i < n));
+  const descs = ['', '1分 — 衝動交易，嚴重違反計畫', '2分 — 多處偏離，紀律不足', '3分 — 部分按計畫，小幅調整', '4分 — 大致按計畫，細節微調', '5分 — 完全執行計畫，知行合一'];
+  document.getElementById('disc-desc').textContent = descs[n];
+}
+
+// ── Auto-calc ──
+function calcAll() {
+  const entry = +document.getElementById('f-entry').value;
+  const sl    = +document.getElementById('f-sl').value;
+  const tp    = +document.getElementById('f-tp').value;
+  const exit  = +document.getElementById('f-exit').value || 0;
+  const qty   = +document.getElementById('f-qty').value || 0;
+  const dir   = document.getElementById('f-dir').value;
+  const isShort = dir === 'short' || dir === 'option_put';
+
+  if (entry && sl) {
+    const pct = Math.abs((sl - entry) / entry * 100);
+    document.getElementById('f-sl-pct').value = pct.toFixed(2) + '%';
+  }
+
+  const rrEl   = document.getElementById('rr-val');
+  const verd   = document.getElementById('rr-verdict');
+  if (entry && sl && tp) {
+    const risk   = Math.abs(entry - sl);
+    const reward = Math.abs(tp - entry);
+    if (risk > 0) {
+      const rr = reward / risk;
+      rrEl.textContent = '1 : ' + rr.toFixed(2);
+      rrEl.className = 'rr-num ' + (rr >= 2 ? 'rr-good' : rr >= 1 ? 'rr-warn' : 'rr-bad');
+      if (rr >= 3)      { verd.textContent = '優秀！風報比 ≥ 1:3，完全符合資深經理人標準'; verd.style.color = 'var(--green)'; }
+      else if (rr >= 2) { verd.textContent = '良好，達到 1:2 門檻，可以考慮進場'; verd.style.color = 'var(--amber)'; }
+      else if (rr >= 1) { verd.textContent = '勉強及格，建議重新評估進場點或調整停損'; verd.style.color = 'var(--amber)'; }
+      else              { verd.textContent = '不建議進場 — 風報比低於 1:1，賠大賺小的結構'; verd.style.color = 'var(--red)'; }
+    }
+  } else {
+    rrEl.textContent = '— : —';
+    rrEl.className = 'rr-num';
+    verd.textContent = '填入進場、停損、目標價後自動計算';
+    verd.style.color = 'var(--text-3)';
+  }
+
+  if (entry && exit && qty) {
+    const diff = isShort ? entry - exit : exit - entry;
+    const pnl  = diff * qty;
+    document.getElementById('f-pnl-display').value = (pnl >= 0 ? '+' : '') + Math.round(pnl).toLocaleString() + ' 元';
+  }
+}
+
+// ── Save trade ──
+function saveTrade() {
+  const sym = document.getElementById('f-sym').value.trim().toUpperCase();
+  if (!sym) { alert('請填入標的代號'); return; }
+  const entry = +document.getElementById('f-entry').value;
+  if (!entry) { alert('請填入進場價格'); return; }
+  const sl = +document.getElementById('f-sl').value;
+  if (!sl) { alert('請填入計畫停損點（進場前必填）'); return; }
+
+  const tp     = +document.getElementById('f-tp').value || null;
+  const qty    = +document.getElementById('f-qty').value || 0;
+  const exitP  = +document.getElementById('f-exit').value || null;
+  const dir    = document.getElementById('f-dir').value;
+  const isShort = dir === 'short' || dir === 'option_put';
+  let pnl = null, pct = null;
+  if (exitP && qty) {
+    const d = isShort ? entry - exitP : exitP - entry;
+    pnl = d * qty;
+    pct = d / entry * 100;
+  }
+
+  const t = {
+    id: Date.now(),
+    sym, date: document.getElementById('f-date').value,
+    time: document.getElementById('f-time').value,
+    dir, cycle: document.getElementById('f-cycle').value,
+    entry, sl, tp, qty, exit: exitP,
+    exitDate: document.getElementById('f-exit-date').value,
+    exitReason: document.getElementById('f-exit-reason').value,
+    pnl, pct,
+    strategy: document.getElementById('f-strategy').value,
+    techSigs:  getChips('tech-pills'),
+    chipSigs:  getChips('chip-pills'),
+    fundSigs:  getChips('fund-pills'),
+    reason:    document.getElementById('f-reason').value,
+    emotion:   document.getElementById('f-emotion').value,
+    market:    document.getElementById('f-market').value,
+    discScore,
+    notes:     document.getElementById('f-notes').value,
+    review:    null
+  };
+  trades.unshift(t);
+  save();
+  clearForm();
+  // Close new trade form and reset button
+  const wrap = document.getElementById('new-trade-wrap');
+  const btn  = document.getElementById('btn-new-trade');
+  if (wrap) wrap.style.display = 'none';
+  if (btn) { btn.textContent = '＋ 新增交易'; btn.style.background = ''; }
+  renderLog();
+  toast('✓ 交易紀錄已儲存');
+}
+
+function clearForm() {
+  ['f-sym','f-entry','f-sl','f-tp','f-qty','f-exit','f-sl-pct','f-pnl-display','f-reason','f-notes','f-exit-date'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-date').valueAsDate = new Date();
+  document.getElementById('f-strategy').value = '';
+  document.getElementById('f-exit-reason').value = '';
+  document.getElementById('f-dir').value = 'long_cash';
+  document.getElementById('f-cycle').value = 'swing_short';
+  document.getElementById('f-emotion').value = 'calm';
+  document.getElementById('f-market').value = 'bull';
+  document.querySelectorAll('.pill.on').forEach(el => el.classList.remove('on','chip','fund'));
+  document.getElementById('rr-val').textContent = '— : —';
+  document.getElementById('rr-val').className = 'rr-num';
+  document.getElementById('rr-verdict').textContent = '填入進場、停損、目標價後自動計算';
+  document.getElementById('rr-verdict').style.color = 'var(--text-3)';
+  setDisc(3);
+}
+
+// ── Maps ──
+const dirL   = {long_cash:'現股多',long_margin:'融資多',short:'借券空',option_call:'Call',option_put:'Put',futures:'期貨'};
+const cycleL = {intraday:'當沖',swing1:'隔日沖',swing_short:'短波段',mid_long:'中長線'};
+const emotL  = {calm:'平靜自信',confident:'積極有把握',anxious:'焦慮恐懼',fomo:'FOMO追高',revenge:'報復交易',hesitant:'猶豫不決'};
+const mktL   = {bull:'多頭排列',bear:'空頭波段',range:'箱型盤整',volatile:'高波動',recovery:'底部反彈'};
+const exitL  = {sl_hit:'觸及停損',tp_hit:'達停利目標',trail_stop:'移動停利',fund_bad:'基本面轉壞',time_stop:'時間停損',market_change:'大盤轉差',forced:'非計畫出場',''	:'—'};
+const stratL = {trend:'趨勢追蹤',breakout:'突破平台',pullback:'回測均線',reversal:'超跌反彈',vol_first:'爆量第一根',sector:'族群輪動',fundamental:'基本面',''	:'未分類'};
+
+// ── Trade log ──
+function renderLog() {
+  const fr = document.getElementById('fl-result').value;
+  const fc = document.getElementById('fl-cycle').value;
+  const fd = document.getElementById('fl-dir').value;
+  const fs = document.getElementById('fl-strategy').value;
+  const fq = (document.getElementById('fl-search').value || '').trim().toUpperCase();
+  let list = trades.filter(t => {
+    const res = t.exit === null ? 'open' : (t.pnl >= 0 ? 'win' : 'loss');
+    if (fq && !t.sym.toUpperCase().includes(fq) && !(t.reason||'').toUpperCase().includes(fq)) return false;
+    if (fr !== 'all' && res !== fr) return false;
+    if (fc !== 'all' && t.cycle !== fc) return false;
+    if (fd !== 'all' && t.dir !== fd) return false;
+    if (fs !== 'all' && t.strategy !== fs) return false;
+    return true;
+  });
+  document.getElementById('log-count').textContent = list.length + ' 筆';
+  const c = document.getElementById('log-list');
+  if (!list.length) {
+    c.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><h3>尚無交易紀錄</h3><p>點上方「＋ 新增交易」記錄你的第一筆</p></div>';
+    return;
+  }
+  c.innerHTML = list.map(t => {
+    const res = t.exit === null ? 'open' : (t.pnl >= 0 ? 'win' : 'loss');
+    const bc  = res === 'win' ? 'b-win' : res === 'loss' ? 'b-loss' : 'b-open';
+    const bl  = res === 'win' ? '獲利' : res === 'loss' ? '虧損' : '持有中';
+    const isOpen = t.exit === null;
+    const pnlHtml = t.pnl !== null
+      ? (t.pnl >= 0
+          ? `<span class="tc-pnl-pos">+${Math.round(t.pnl).toLocaleString()}元 (${t.pct.toFixed(1)}%)</span>`
+          : `<span class="tc-pnl-neg">${Math.round(t.pnl).toLocaleString()}元 (${t.pct.toFixed(1)}%)</span>`)
+      : '—';
+    const rrTxt = (t.sl && t.tp) ? 'R:R ' + (Math.abs(t.tp - t.entry) / Math.abs(t.entry - t.sl)).toFixed(1) : '';
+    const sigs = [...(t.techSigs||[]),...(t.chipSigs||[]),...(t.fundSigs||[])].slice(0,5).join('・');
+    // Floating P&L preview for open trades (vs stop loss / target)
+    let floatHint = '';
+    if (isOpen && t.sl) {
+      const isShort = t.dir === 'short' || t.dir === 'option_put';
+      const slPct = (Math.abs(t.entry - t.sl) / t.entry * 100).toFixed(1);
+      const tpPct = t.tp ? (Math.abs(t.tp - t.entry) / t.entry * 100).toFixed(1) : null;
+      floatHint = `<span style="color:var(--red)">停損 ${t.sl} (-${slPct}%)</span>`;
+      if (tpPct) floatHint += ` <span style="color:var(--green)">目標 ${t.tp} (+${tpPct}%)</span>`;
+    }
+    return `<div class="trade-card" id="card-${t.id}">
+      <div class="tc-top">
+        <div class="tc-left">
+          <div class="tc-sym">${t.sym}</div>
+          <div class="tc-badges">
+            <span class="badge ${bc}">${bl}</span>
+            <span class="badge b-dir">${dirL[t.dir]||t.dir}</span>
+            <span class="badge b-cycle">${cycleL[t.cycle]||t.cycle}</span>
+            ${t.strategy ? '<span class="badge" style="background:var(--bg);color:var(--text-2)">'+stratL[t.strategy]+'</span>' : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          ${isOpen ? `<button class="btn-fill-exit" onclick="toggleExitForm(${t.id})">補填出場 ↓</button>` : ''}
+          <button class="btn-del" onclick="deleteTrade(${t.id})">刪除</button>
+        </div>
+      </div>
+      <div class="tc-meta">
+        <span>${t.date}${t.time?' '+t.time:''}</span>
+        <span>進場 <strong>${t.entry}</strong></span>
+        ${t.exit ? '<span>出場 <strong>'+t.exit+'</strong></span>' : ''}
+        <span>${pnlHtml}</span>
+        ${floatHint ? `<span>${floatHint}</span>` : ''}
+        ${rrTxt ? '<span>'+rrTxt+'</span>' : ''}
+        <span>紀律 ${'★'.repeat(t.discScore)}${'☆'.repeat(5-t.discScore)}</span>
+      </div>
+      ${sigs ? `<div class="tc-detail">訊號：${sigs}</div>` : ''}
+      ${t.reason ? `<div class="tc-detail">${t.reason.slice(0,120)}${t.reason.length>120?'...':''}</div>` : ''}
+      <div id="exit-form-${t.id}" style="display:none"></div>
+    </div>`;
+  }).join('');
+}
+
+function toggleNewTrade() {
+  const wrap = document.getElementById('new-trade-wrap');
+  const btn  = document.getElementById('btn-new-trade');
+  const open = wrap.style.display === 'none' || wrap.style.display === '';
+  wrap.style.display = open ? 'block' : 'none';
+  if (btn) {
+    btn.textContent = open ? '✕ 取消' : '＋ 新增交易';
+    btn.style.background = open ? 'var(--text-2)' : '';
+  }
+  if (open) {
+    document.getElementById('f-date').valueAsDate = new Date();
+    setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  }
+}
+
+function clearLogFilters() {
+  document.getElementById('fl-search').value = '';
+  document.getElementById('fl-result').value = 'all';
+  document.getElementById('fl-cycle').value = 'all';
+  document.getElementById('fl-dir').value = 'all';
+  document.getElementById('fl-strategy').value = 'all';
+  renderLog();
+}
+
+function deleteTrade(id) {
+  if (!confirm('確定刪除這筆交易？')) return;
+  trades = trades.filter(t => t.id !== id);
+  save(); renderLog();
+}
+
+function toggleExitForm(id) {
+  const slot = document.getElementById('exit-form-' + id);
+  if (!slot) return;
+  if (slot.style.display !== 'none') { slot.style.display = 'none'; return; }
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  const today = new Date().toISOString().slice(0,10);
+  const isShort = t.dir === 'short' || t.dir === 'option_put';
+  slot.style.display = 'block';
+  slot.innerHTML = `
+    <div class="exit-form">
+      <div class="exit-form-title">補填出場紀錄 — ${t.sym} 進場 @${t.entry}</div>
+      <div class="exit-form g3">
+        <div class="field">
+          <label>出場日期</label>
+          <input type="date" id="ef-date-${id}" value="${today}">
+        </div>
+        <div class="field">
+          <label>出場價格</label>
+          <input type="number" id="ef-price-${id}" step="0.01" placeholder="0.00"
+            oninput="previewPnl(${id},${t.entry},${t.qty},'${t.dir}')">
+        </div>
+        <div class="field">
+          <label>預估損益</label>
+          <input type="text" id="ef-pnl-${id}" readonly placeholder="填入出場價後顯示">
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px">
+        <label>出場理由</label>
+        <select id="ef-reason-${id}">
+          <option value="">選擇出場理由...</option>
+          <option value="sl_hit">觸及既定停損（紀律執行）</option>
+          <option value="tp_hit">達到既定停利目標</option>
+          <option value="trail_stop">移動停利（如跌破5日線）</option>
+          <option value="fund_bad">基本面轉壞</option>
+          <option value="time_stop">時間停損（盤整太久）</option>
+          <option value="market_change">大盤環境轉差</option>
+          <option value="forced">非計畫性出場（情緒）</option>
+        </select>
+      </div>
+      <div class="exit-form-actions">
+        <button class="btn-exit-cancel" onclick="toggleExitForm(${id})">取消</button>
+        <button class="btn-exit-save" onclick="saveExit(${id})">確認出場，儲存</button>
+      </div>
+    </div>
+  `;
+}
+
+function previewPnl(id, entry, qty, dir) {
+  const exitP = +document.getElementById('ef-price-' + id).value;
+  if (!exitP || !qty) return;
+  const isShort = dir === 'short' || dir === 'option_put';
+  const diff = isShort ? entry - exitP : exitP - entry;
+  const pnl = diff * qty;
+  const pct = diff / entry * 100;
+  const el = document.getElementById('ef-pnl-' + id);
+  el.value = (pnl >= 0 ? '+' : '') + Math.round(pnl).toLocaleString() + ' 元 (' + pct.toFixed(1) + '%)';
+  el.style.color = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  el.style.fontWeight = '600';
+}
+
+function saveExit(id) {
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  const exitP = +document.getElementById('ef-price-' + id).value;
+  const exitDate = document.getElementById('ef-date-' + id).value;
+  const exitReason = document.getElementById('ef-reason-' + id).value;
+  if (!exitP) { alert('請填入出場價格'); return; }
+  if (!exitDate) { alert('請填入出場日期'); return; }
+  if (!exitReason) { alert('請選擇出場理由'); return; }
+  const isShort = t.dir === 'short' || t.dir === 'option_put';
+  const diff = isShort ? t.entry - exitP : exitP - t.entry;
+  t.exit = exitP;
+  t.exitDate = exitDate;
+  t.exitReason = exitReason;
+  t.pnl = diff * (t.qty || 0);
+  t.pct = diff / t.entry * 100;
+  save();
+  renderLog();
+  toast((t.pnl >= 0 ? '✓ 出場紀錄已儲存，獲利 +' : '✓ 出場紀錄已儲存，虧損 ') + Math.round(Math.abs(t.pnl)).toLocaleString() + ' 元');
+}
+
+// ── Review ──
+let _allRvOpts = [];
+function renderRvSel() {
+  _allRvOpts = trades.map(t => ({
+    id: t.id,
+    sym: t.sym,
+    label: `[${t.date}] ${t.sym} ${dirL[t.dir]||t.dir} @${t.entry} ${t.exit?'(已出場)':'(持有中)'} ${t.pnl!==null?(t.pnl>=0?'✓獲利':'✗虧損'):''}`
+  }));
+  filterRvList();
+  document.getElementById('rv-content').innerHTML = '';
+}
+function filterRvList() {
+  const q = (document.getElementById('rv-search').value || '').trim().toUpperCase();
+  const filtered = q ? _allRvOpts.filter(o => o.sym.includes(q) || o.label.toUpperCase().includes(q)) : _allRvOpts;
+  const s = document.getElementById('rv-sel');
+  const cur = s.value;
+  s.innerHTML = '<option value="">— 選擇交易 —</option>' +
+    filtered.map(o => `<option value="${o.id}" ${String(o.id)===cur?'selected':''}>${o.label}</option>`).join('');
+}
+
+function tvSymbol(sym, dir) {
+  // Map TW stock codes to TradingView format
+  const s = sym.replace(/[^0-9A-Za-z]/g, '');
+  if (/^\d+$/.test(s)) return 'TWSE:' + s;
+  if (dir && (dir === 'futures')) return 'TWSE:' + s;
+  return 'TWSE:' + s;
+}
+
+function loadReview() {
+  const id = +document.getElementById('rv-sel').value;
+  if (!id) return;
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  const r = t.review || {};
+  const res = t.exit === null ? '持有中'
+    : (t.pnl >= 0 ? `獲利 +${Math.round(t.pnl).toLocaleString()}元 (${t.pct.toFixed(1)}%)` : `虧損 ${Math.round(t.pnl).toLocaleString()}元 (${t.pct.toFixed(1)}%)`);
+  const allSigs = [...(t.techSigs||[]),...(t.chipSigs||[]),...(t.fundSigs||[])].join('、');
+
+  // Determine chart interval based on cycle
+  const intervalMap = { intraday:'5', swing1:'15', swing_short:'D', mid_long:'W' };
+  const interval = intervalMap[t.cycle] || 'D';
+  const tvSym = tvSymbol(t.sym, t.dir);
+
+  // Build date range: entry date -30 days to exit date +15 days (or today)
+  const entryTs = t.date ? new Date(t.date).getTime()/1000 : null;
+  const exitTs  = t.exitDate ? new Date(t.exitDate).getTime()/1000 : Math.floor(Date.now()/1000);
+  const fromTs  = entryTs ? entryTs - 30*86400 : exitTs - 90*86400;
+  const toTs    = exitTs + 15*86400;
+
+  // TradingView widget config
+  const tvConfig = {
+    autosize: true,
+    symbol: tvSym,
+    interval: interval,
+    timezone: 'Asia/Taipei',
+    theme: 'light',
+    style: '1',
+    locale: 'zh_TW',
+    toolbar_bg: '#f7f7f5',
+    enable_publishing: false,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    save_image: false,
+    studies: ['RSI@tv-basicstudies','MASimple@tv-basicstudies'],
+    show_popup_button: true,
+    popup_width: '1000',
+    popup_height: '650',
+    container_id: 'tv_chart_container'
+  };
+
+  document.getElementById('rv-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+      <div class="rv-summary">
+        <div style="font-size:15px;font-weight:700;margin-bottom:12px">${t.sym} · ${dirL[t.dir]||t.dir} · ${cycleL[t.cycle]||t.cycle} · ${t.date}</div>
+        <div class="rv-row"><span>進場理由</span><span class="rv-val">${t.reason||'（未記錄）'}</span></div>
+        <div class="rv-row"><span>進場訊號</span><span class="rv-val">${allSigs||'（未選）'}</span></div>
+        <div class="rv-row"><span>策略框架</span><span class="rv-val">${stratL[t.strategy]||'未分類'}</span></div>
+        <div class="rv-row"><span>進場價</span><span class="rv-val" style="font-weight:600;color:var(--blue)">${t.entry}</span></div>
+        <div class="rv-row"><span>計畫停損</span><span class="rv-val" style="font-weight:600;color:var(--red)">${t.sl||'—'}</span></div>
+        <div class="rv-row"><span>計畫目標</span><span class="rv-val" style="font-weight:600;color:var(--green)">${t.tp||'—'}</span></div>
+        ${t.exit ? `<div class="rv-row"><span>出場價</span><span class="rv-val" style="font-weight:600">${t.exit}</span></div>` : ''}
+        <div class="rv-row"><span>出場理由</span><span class="rv-val">${exitL[t.exitReason]||'—'}</span></div>
+        <div class="rv-row"><span>交易結果</span><span class="rv-val">${res}</span></div>
+        <div class="rv-row"><span>紀律評分</span><span class="rv-val">${'★'.repeat(t.discScore)}${'☆'.repeat(5-t.discScore)} (${t.discScore}/5)</span></div>
+        <div class="rv-row"><span>進場前情緒</span><span class="rv-val">${emotL[t.emotion]||t.emotion}</span></div>
+        <div class="rv-row"><span>大盤環境</span><span class="rv-val">${mktL[t.market]||t.market}</span></div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-2)">
+            K 線圖 — ${t.sym}
+            <span style="font-size:11px;color:var(--text-3);font-weight:400;margin-left:6px">${interval==='5'?'5分鐘':interval==='15'?'15分鐘':interval==='D'?'日線':'週線'}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button onclick="setTvInterval('1')" class="tv-int-btn" data-int="1">1分</button>
+            <button onclick="setTvInterval('5')" class="tv-int-btn" data-int="5">5分</button>
+            <button onclick="setTvInterval('15')" class="tv-int-btn" data-int="15">15分</button>
+            <button onclick="setTvInterval('D')" class="tv-int-btn ${interval==='D'?'tv-int-active':''}" data-int="D">日</button>
+            <button onclick="setTvInterval('W')" class="tv-int-btn ${interval==='W'?'tv-int-active':''}" data-int="W">週</button>
+            <button onclick="setTvInterval('M')" class="tv-int-btn" data-int="M">月</button>
+          </div>
+        </div>
+        <div id="tv_chart_container" style="height:420px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;background:var(--bg)"></div>
+        <div style="margin-top:8px;padding:8px 12px;background:var(--blue-light);border-radius:var(--radius);font-size:11px;color:var(--blue)">
+          <strong>進場</strong> ${t.entry}
+          ${t.sl ? ` · <strong style="color:var(--red)">停損</strong> <span style="color:var(--red)">${t.sl}</span>` : ''}
+          ${t.tp ? ` · <strong style="color:var(--green)">目標</strong> <span style="color:var(--green)">${t.tp}</span>` : ''}
+          ${t.exit ? ` · <strong>出場</strong> ${t.exit}` : ''}
+          &nbsp;·&nbsp; 圖表由 TradingView 提供，需聯網顯示
+        </div>
+      </div>
+    </div>
+
+    <div class="mod-row" style="margin-top:20px"><span class="mod-chip">模塊五</span><span class="mod-title">經理人覆盤筆記</span><span class="mod-hint">結案時三個必問問題</span></div>
+
+    <div class="qbox">
+      <div class="qlabel">問題一：如果重新來過，你還會在這個價位買進嗎？為什麼？</div>
+      <textarea id="rv-q1" placeholder="誠實回答：進場點是否仍然合理？還是只是後見之明的合理化？">${r.q1||''}</textarea>
+    </div>
+    <div class="qbox">
+      <div class="qlabel">問題二：如果是賺錢的單，是賺到計畫中的波段，還是單純運氣好碰上行情？</div>
+      <textarea id="rv-q2" placeholder="區分「可複製的獲利」與「偶然的市場幸運」，建立正確的信心基礎...">${r.q2||''}</textarea>
+    </div>
+    <div class="qbox">
+      <div class="qlabel">問題三：如果是賠錢的單，進場點是買在「主升段起漲點」還是「末升段追高點」？</div>
+      <textarea id="rv-q3" placeholder="客觀分析進場位置在行情中的位置，建立對「末升段特徵」的識別能力...">${r.q3||''}</textarea>
+    </div>
+    <div class="field mt12"><label>下次遇到同樣型態，具體要做什麼不同？</label>
+      <textarea id="rv-lesson" placeholder="具體描述行為層面的改變...">${r.lesson||''}</textarea>
+    </div>
+    <div class="field mt8"><label>下次潛在進場觀察點</label>
+      <textarea id="rv-next" placeholder="例：等股價回測20MA且成交量萎縮至均量0.7倍以下，出現日線止跌K後次日再進場...">${r.next||''}</textarea>
+    </div>
+    <div class="action-row">
+      <button class="btn-primary" onclick="saveReview(${id})">儲存覆盤筆記</button>
+    </div>
+  `;
+
+  // Load TradingView widget
+  _currentTvSym = tvSym;
+  _currentTvInterval = interval;
+  loadTvWidget(tvSym, interval);
+}
+
+let _currentTvSym = '';
+let _currentTvInterval = 'D';
+let _tvScript = null;
+
+function loadTvWidget(sym, interval) {
+  const container = document.getElementById('tv_chart_container');
+  if (!container) return;
+  container.innerHTML = '';
+  // Update active button
+  document.querySelectorAll('.tv-int-btn').forEach(b => b.classList.toggle('tv-int-active', b.dataset.int === interval));
+  const script = document.createElement('script');
+  script.src = 'https://s3.tradingview.com/tv.js';
+  script.onload = function() {
+    if (typeof TradingView === 'undefined') return;
+    new TradingView.widget({
+      autosize: true,
+      symbol: sym,
+      interval: interval,
+      timezone: 'Asia/Taipei',
+      theme: 'light',
+      style: '1',
+      locale: 'zh_TW',
+      toolbar_bg: '#f7f7f5',
+      enable_publishing: false,
+      save_image: false,
+      studies: ['RSI@tv-basicstudies', 'MASimple@tv-basicstudies'],
+      container_id: 'tv_chart_container',
+      hide_side_toolbar: false,
+      allow_symbol_change: true,
+      show_popup_button: false,
+    });
+  };
+  if (window.TradingView) {
+    script.onload();
+  } else {
+    document.head.appendChild(script);
+  }
+}
+
+function setTvInterval(interval) {
+  _currentTvInterval = interval;
+  loadTvWidget(_currentTvSym, interval);
+}
+
+function saveReview(id) {
+  const t = trades.find(x => x.id === id);
+  if (!t) return;
+  t.review = {
+    q1: document.getElementById('rv-q1').value,
+    q2: document.getElementById('rv-q2').value,
+    q3: document.getElementById('rv-q3').value,
+    lesson: document.getElementById('rv-lesson').value,
+    next: document.getElementById('rv-next').value
+  };
+  save(); toast('✓ 覆盤筆記已儲存');
+}
+
+// ── Stats ──
+let charts = [];
+function destroyCharts() { charts.forEach(c => { try { c.destroy(); } catch(e) {} }); charts = []; }
+
+function renderStats() {
+  destroyCharts();
+  const closed = trades.filter(t => t.exit !== null && t.pnl !== null);
+  if (!closed.length) {
+    document.getElementById('st-metrics').innerHTML = '';
+    document.getElementById('st-charts').innerHTML = '';
+    document.getElementById('st-insights').innerHTML = '<div class="empty"><div class="empty-icon">📊</div><h3>尚無已出場的交易</h3><p>出場後補填出場價格，統計會自動更新</p></div>';
+    return;
+  }
+
+  const wins   = closed.filter(t => t.pnl > 0);
+  const losses = closed.filter(t => t.pnl <= 0);
+  const wr     = Math.round(wins.length / closed.length * 100);
+  const totalPnL = closed.reduce((a, t) => a + t.pnl, 0);
+  const avgW   = wins.length ? wins.reduce((a, t) => a + t.pnl, 0) / wins.length : 0;
+  const avgL   = losses.length ? Math.abs(losses.reduce((a, t) => a + t.pnl, 0) / losses.length) : 1;
+  const pf     = losses.length ? (avgW * wins.length) / (avgL * losses.length) : 99;
+  const expect = (wr/100) * avgW - (1 - wr/100) * avgL;
+  const avgDisc = trades.reduce((a, t) => a + t.discScore, 0) / trades.length;
+
+  document.getElementById('st-metrics').innerHTML = `
+    <div class="mcard"><div class="mlabel">總交易筆數</div><div class="mval">${closed.length}</div><div class="msub">已出場</div></div>
+    <div class="mcard"><div class="mlabel">勝率</div><div class="mval" style="color:${wr>=50?'var(--green)':'var(--red)'}">${wr}%</div><div class="msub">${wins.length}勝 ${losses.length}敗</div></div>
+    <div class="mcard"><div class="mlabel">獲利因子</div><div class="mval" style="color:${pf>=1.5?'var(--green)':pf>=1?'var(--amber)':'var(--red)'}">${pf===99?'∞':pf.toFixed(2)}</div><div class="msub">目標 ≥ 1.5</div></div>
+    <div class="mcard"><div class="mlabel">期望值 / 筆</div><div class="mval" style="color:${expect>=0?'var(--green)':'var(--red)'}">${expect>=0?'+':''}${Math.round(expect).toLocaleString()}</div><div class="msub">元</div></div>
+  `;
+
+  // ── Cumulative PnL ──
+  const cumPnL = []; let running = 0;
+  [...closed].reverse().forEach(t => { running += t.pnl; cumPnL.push(+running.toFixed(0)); });
+  const ptColors = cumPnL.map((v,i) => i===0?'#1a5fa8' : (cumPnL[i]>cumPnL[i-1]?'#2a7a3a':'#c0291e'));
+
+  // ── Rolling 20-trade expected value ──
+  const rollData = [];
+  for (let i = 19; i < closed.length; i++) {
+    const slice = closed.slice(i-19, i+1);
+    const sw2 = slice.filter(t=>t.pnl>0);
+    const sl2 = slice.filter(t=>t.pnl<=0);
+    const aw  = sw2.length ? sw2.reduce((a,t)=>a+t.pnl,0)/sw2.length : 0;
+    const al  = sl2.length ? Math.abs(sl2.reduce((a,t)=>a+t.pnl,0)/sl2.length) : 0;
+    const ev  = (sw2.length/20)*aw - (sl2.length/20)*al;
+    rollData.push(+ev.toFixed(0));
+  }
+  const rollLabels = rollData.map((_, i) => '#' + (i+20));
+
+  // ── Strategy win rate ──
+  const stratKeys = ['trend','breakout','pullback','reversal','vol_first','sector','fundamental'];
+  const stratData = stratKeys.map(k => {
+    const arr = closed.filter(t => t.strategy === k);
+    return { label: stratL[k], wr: arr.length ? Math.round(arr.filter(t=>t.pnl>0).length/arr.length*100) : 0, n: arr.length };
+  }).filter(d => d.n > 0);
+
+  // ── Market env win rate ──
+  const mktKeys = ['bull','bear','range','volatile','recovery'];
+  const mktData = mktKeys.map(k => {
+    const arr = closed.filter(t => t.market === k);
+    return { label: mktL[k], wr: arr.length ? Math.round(arr.filter(t=>t.pnl>0).length/arr.length*100):0, n: arr.length };
+  }).filter(d => d.n > 0);
+
+  document.getElementById('st-charts').innerHTML = `
+    <div class="chart-section">
+      <div class="chart-title">累計損益曲線</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-pnl" role="img" aria-label="累計損益走勢">累計損益</canvas></div>
+    </div>
+    ${rollData.length >= 2 ? `<div class="chart-section">
+      <div class="chart-title">滾動20筆期望值 — 若持續下滑請停手檢討策略</div>
+      <div class="chart-wrap" style="height:160px"><canvas id="ch-roll" role="img" aria-label="滾動20筆期望值">滾動期望值</canvas></div>
+    </div>` : ''}
+    ${stratData.length ? `<div class="chart-section">
+      <div class="chart-title">策略勝率分析</div>
+      <div class="chart-wrap" style="height:${Math.max(stratData.length*44+60,100)}px"><canvas id="ch-strat" role="img" aria-label="各策略勝率">策略勝率</canvas></div>
+    </div>` : ''}
+    ${mktData.length ? `<div class="chart-section">
+      <div class="chart-title">大盤環境 × 勝率</div>
+      <div class="chart-wrap" style="height:${Math.max(mktData.length*44+60,100)}px"><canvas id="ch-mkt" role="img" aria-label="大盤環境勝率">市場環境勝率</canvas></div>
+    </div>` : ''}
+  `;
+
+  charts.push(new Chart(document.getElementById('ch-pnl'), {
+    type:'line',
+    data:{ labels: cumPnL.map((_,i)=>'#'+(i+1)), datasets:[{ data:cumPnL, borderColor:'#1a5fa8', backgroundColor:'rgba(26,95,168,.07)', tension:.3, fill:true, pointBackgroundColor:ptColors, pointRadius:3, borderWidth:1.5 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{grid:{color:'rgba(0,0,0,.05)'}, ticks:{callback:v=>v>=0?'+'+v.toLocaleString():v.toLocaleString()}}, x:{grid:{display:false}} } }
+  }));
+
+  if (rollData.length >= 2) {
+    const rollColors = rollData.map(v => v >= 0 ? 'rgba(42,122,58,.15)' : 'rgba(192,41,30,.15)');
+    const rollBorder = rollData.map(v => v >= 0 ? '#2a7a3a' : '#c0291e');
+    charts.push(new Chart(document.getElementById('ch-roll'), {
+      type:'bar',
+      data:{ labels: rollLabels, datasets:[{ data:rollData, backgroundColor:rollColors, borderColor:rollBorder, borderWidth:1 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ y:{grid:{color:'rgba(0,0,0,.05)'}, ticks:{callback:v=>v>=0?'+'+Math.round(v):Math.round(v)}}, x:{grid:{display:false}, ticks:{maxTicksLimit:10}} } }
+    }));
+  }
+
+  if (stratData.length) {
+    charts.push(new Chart(document.getElementById('ch-strat'), {
+      type:'bar',
+      data:{ labels:stratData.map(d=>d.label+' ('+d.n+')'), datasets:[{ data:stratData.map(d=>d.wr), backgroundColor:stratData.map(d=>d.wr>=50?'rgba(42,122,58,.75)':'rgba(192,41,30,.75)'), borderRadius:4 }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{min:0,max:100,ticks:{callback:v=>v+'%'}}, y:{grid:{display:false}} } }
+    }));
+  }
+
+  if (mktData.length) {
+    charts.push(new Chart(document.getElementById('ch-mkt'), {
+      type:'bar',
+      data:{ labels:mktData.map(d=>d.label+' ('+d.n+')'), datasets:[{ data:mktData.map(d=>d.wr), backgroundColor:mktData.map(d=>d.wr>=50?'rgba(26,95,168,.75)':'rgba(176,96,16,.75)'), borderRadius:4 }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{min:0,max:100,ticks:{callback:v=>v+'%'}}, y:{grid:{display:false}} } }
+    }));
+  }
+
+  // ── Insights ──
+  const insights = [];
+  const fomoTr = closed.filter(t => t.emotion === 'fomo');
+  if (fomoTr.length >= 2) {
+    const fw = Math.round(fomoTr.filter(t=>t.pnl>0).length/fomoTr.length*100);
+    insights.push({ c: fw<40?'ins-b':fw<55?'ins-w':'ins-g', t:`FOMO情緒進場勝率 ${fw}%（${fomoTr.length}筆）`, d: fw<40?'嚴重警示：FOMO追高是最大績效殺手，建議設立「看到訊號後等30分鐘再決定」的強制冷靜規則。':'持續追蹤此指標，保持警覺。' });
+  }
+  const revTr = closed.filter(t => t.emotion === 'revenge');
+  if (revTr.length >= 2) {
+    const rw = Math.round(revTr.filter(t=>t.pnl>0).length/revTr.length*100);
+    insights.push({ c: rw<45?'ins-b':'ins-w', t:`報復性交易勝率 ${rw}%（${revTr.length}筆）`, d: '報復交易通常在情緒最差時進場，虧損虧損後務必強制休息一天，恢復理性再交易。' });
+  }
+  const highDisc = closed.filter(t => t.discScore >= 4);
+  const lowDisc  = closed.filter(t => t.discScore <= 2);
+  if (highDisc.length >= 2 && lowDisc.length >= 2) {
+    const hw = Math.round(highDisc.filter(t=>t.pnl>0).length/highDisc.length*100);
+    const lw = Math.round(lowDisc.filter(t=>t.pnl>0).length/lowDisc.length*100);
+    insights.push({ c: hw>lw?'ins-g':'ins-w', t:`高紀律(4-5分) ${hw}% vs 低紀律(1-2分) ${lw}%`, d: hw>lw?`高紀律交易勝率高出低紀律 ${hw-lw} 個百分點，系統化方法正在奏效，繼續堅守計畫。`:`目前高低紀律勝率差距不明顯，請持續累積樣本，同時檢視策略本身的有效性。` });
+  }
+  if (rollData.length >= 5) {
+    const last5 = rollData.slice(-5);
+    const trend = last5[4] - last5[0];
+    if (trend < -5000) insights.push({ c:'ins-b', t:'近期滾動期望值持續下滑', d:'最近5筆的滾動期望值呈下降趨勢，建議暫停交易，回頭檢視策略是否失效或市場環境已改變。' });
+  }
+  if (!insights.length) insights.push({ c:'ins-g', t:'持續累積紀錄中', d:'建議累積至少20筆已出場交易後，統計洞察才具備足夠的參考意義。' });
+
+  document.getElementById('st-insights').innerHTML =
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:10px">系統洞察</div>' +
+    insights.map(ins => `<div class="insight ${ins.c}"><div class="ins-title">${ins.t}</div><div class="ins-body">${ins.d}</div></div>`).join('');
+}
+
+// ── Position calculator ──
+function calcPos() {
+  const capital  = +document.getElementById('c-capital').value;
+  const riskPct  = +document.getElementById('c-risk-pct').value;
+  const entry    = +document.getElementById('c-entry').value;
+  const sl       = +document.getElementById('c-sl').value;
+  const tp       = +document.getElementById('c-tp').value;
+  const lotSize  = +document.getElementById('c-lot').value || 1000;
+  const warnEl   = document.getElementById('c-warning');
+
+  if (!capital || !riskPct || !entry || !sl) {
+    ['c-max-loss','c-lots','c-cost','c-rr','c-rr-verdict','c-max-profit'].forEach(id => document.getElementById(id).textContent = '—');
+    warnEl.style.display = 'none';
+    return;
+  }
+
+  const maxLoss    = capital * riskPct / 100;
+  const riskPerSh  = Math.abs(entry - sl);
+  if (riskPerSh === 0) return;
+  const riskPerLot = riskPerSh * lotSize;
+  const lots       = Math.floor(maxLoss / riskPerLot);
+  const cost       = lots * entry * lotSize;
+  const profit     = tp ? lots * Math.abs(tp - entry) * lotSize : null;
+  const rr         = tp ? Math.abs(tp - entry) / riskPerSh : null;
+
+  document.getElementById('c-max-loss').textContent = Math.round(maxLoss).toLocaleString() + ' 元';
+  document.getElementById('c-lots').textContent = lots > 0 ? lots : '< 1';
+  document.getElementById('c-cost').textContent = cost > 0 ? Math.round(cost).toLocaleString() : '—';
+  document.getElementById('c-max-profit').textContent = profit !== null ? '+' + Math.round(profit).toLocaleString() + ' 元' : '（請填入目標價）';
+
+  if (rr !== null) {
+    document.getElementById('c-rr').textContent = '1 : ' + rr.toFixed(2);
+    document.getElementById('c-rr').style.color = rr >= 2 ? 'var(--green)' : rr >= 1 ? 'var(--amber)' : 'var(--red)';
+    document.getElementById('c-rr-verdict').textContent = rr >= 2 ? '符合標準' : rr >= 1 ? '勉強及格' : '不建議進場';
+  }
+
+  warnEl.style.display = 'none';
+  if (lots === 0) {
+    warnEl.style.display = 'block';
+    warnEl.textContent = '⚠ 此設定下，即使買1張的損失也超過最大允許損失。請重新考慮停損點或縮小進場資金比例。';
+  } else if (cost > capital * 0.5) {
+    warnEl.style.display = 'block';
+    warnEl.textContent = '⚠ 此倉位將占用總資金超過50%，集中度過高，請確認你的風險承受能力。';
+  }
+}
+
+// ── Symbol analysis ──
+// ── Watchlist ──
+let watchList = JSON.parse(localStorage.getItem('watchList') || '[]');
+function saveWatch_data(){ localStorage.setItem('watchList', JSON.stringify(watchList)); }
+
+function openWatchForm(){
+  document.getElementById('watch-form-wrap').style.display = 'block';
+  document.getElementById('w-date').valueAsDate = new Date();
+}
+function closeWatchForm(){
+  document.getElementById('watch-form-wrap').style.display = 'none';
+  ['w-sym','w-entry-range','w-trigger','w-reason'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('w-strategy').value = '';
+  document.getElementById('w-priority').value = 'high';
+}
+function saveWatch(){
+  const sym = document.getElementById('w-sym').value.trim().toUpperCase();
+  if (!sym) { alert('請填入股票代號'); return; }
+  const item = {
+    id: Date.now(),
+    sym,
+    strategy: document.getElementById('w-strategy').value,
+    priority: document.getElementById('w-priority').value,
+    entryRange: document.getElementById('w-entry-range').value,
+    trigger: document.getElementById('w-trigger').value,
+    date: document.getElementById('w-date').value,
+    reason: document.getElementById('w-reason').value,
+    status: 'watching' // watching | promoted | dropped
+  };
+  watchList.unshift(item);
+  saveWatch_data();
+  closeWatchForm();
+  renderWatchList();
+  toast('✓ 已加入觀察名單：' + sym);
+}
+function dropWatch(id){
+  if (!confirm('移除此觀察標的？')) return;
+  watchList = watchList.filter(w => w.id !== id);
+  saveWatch_data();
+  renderWatchList();
+}
+function promoteWatch(id){
+  const w = watchList.find(x => x.id === id);
+  if (!w) return;
+  w.status = 'promoted';
+  saveWatch_data();
+  renderWatchList();
+  // Pre-fill new trade form
+  sw('log');
+  setTimeout(() => {
+    const wrap = document.getElementById('new-trade-wrap');
+    const btn  = document.getElementById('btn-new-trade');
+    if (wrap) { wrap.style.display = 'block'; wrap.scrollIntoView({ behavior:'smooth', block:'start' }); }
+    const btn2 = document.getElementById('btn-new-trade'); if (btn2) { btn2.textContent = '✕ 取消'; btn2.style.background = 'var(--text-2)'; }
+    document.getElementById('f-sym').value = w.sym;
+    if (w.strategy) document.getElementById('f-strategy').value = w.strategy;
+    document.getElementById('f-date').valueAsDate = new Date();
+  }, 80);
+  toast('✓ 已帶入新增交易表單：' + w.sym + '，請補填進場細節');
+}
+function renderWatchList(){
+  const c = document.getElementById('watch-list');
+  if (!c) return;
+  const active = watchList.filter(w => w.status === 'watching');
+  const done   = watchList.filter(w => w.status !== 'watching');
+  if (!watchList.length){
+    c.innerHTML = '<div style="padding:20px 0;color:var(--text-3);font-size:13px">尚無觀察標的。點「＋ 新增觀察」開始追蹤潛力股，條件成熟時一鍵轉為交易。</div>';
+    return;
+  }
+  const priLabel = { high:'🔴 高', mid:'🟡 中', low:'⚪ 低' };
+  const priClass = { high:'b-hi', mid:'b-mi', low:'b-lo' };
+  const renderCard = (w, isDone) => {
+    const histTrades = trades.filter(t => t.sym === w.sym && t.pnl !== null);
+    const histWr = histTrades.length
+      ? Math.round(histTrades.filter(t=>t.pnl>0).length/histTrades.length*100) + '% (' + histTrades.length + '筆歷史)'
+      : '無歷史紀錄';
+    return `<div class="watch-card" style="${isDone?'opacity:.55':''}">
+      <div class="watch-top">
+        <div>
+          <div class="watch-sym">${w.sym}${isDone?' <span style="font-size:12px;font-weight:400;color:var(--text-3)">('+( w.status==='promoted'?'已進場':'已移除')+')</span>':''}</div>
+          <div class="watch-badges">
+            <span class="badge ${priClass[w.priority]||'b-lo'}">${priLabel[w.priority]||w.priority}</span>
+            ${w.strategy?'<span class="badge b-cycle">'+stratL[w.strategy]+'</span>':''}
+            <span class="badge" style="background:var(--bg);color:var(--text-3)">${w.date||''}</span>
+            <span class="badge" style="background:var(--bg);color:var(--blue)">歷史勝率 ${histWr}</span>
+          </div>
+        </div>
+        ${!isDone ? `<div class="watch-actions">
+          <button class="btn-promote" onclick="promoteWatch(${w.id})">→ 轉為進場</button>
+          <button class="btn-del" onclick="dropWatch(${w.id})">移除</button>
+        </div>` : ''}
+      </div>
+      <div class="watch-meta">
+        ${w.entryRange?'<span>理想進場：<strong>'+w.entryRange+'</strong></span>':''}
+        ${w.trigger?'<span>觸發條件：'+w.trigger+'</span>':''}
+      </div>
+      ${w.reason?`<div class="watch-reason">${w.reason}</div>`:''}
+    </div>`;
+  };
+  c.innerHTML =
+    active.map(w => renderCard(w, false)).join('') +
+    (done.length ? `<div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px">已完成</div>` + done.map(w => renderCard(w, true)).join('') : '');
+}
+
+function resetAnalysis(){
+  ['an-strategy','an-cycle','an-market','an-disc','an-emotion'].forEach(id => {
+    document.getElementById(id).value = 'all';
+  });
+  renderSymbols();
+}
+
+function renderSymbols() {
+  renderWatchList();
+
+  const anStrat  = document.getElementById('an-strategy')?.value || 'all';
+  const anCycle  = document.getElementById('an-cycle')?.value || 'all';
+  const anMarket = document.getElementById('an-market')?.value || 'all';
+  const anDisc   = document.getElementById('an-disc')?.value || 'all';
+  const anEmot   = document.getElementById('an-emotion')?.value || 'all';
+
+  const closed = trades.filter(t => {
+    if (t.exit === null || t.pnl === null) return false;
+    if (anStrat  !== 'all' && t.strategy !== anStrat)  return false;
+    if (anCycle  !== 'all' && t.cycle    !== anCycle)  return false;
+    if (anMarket !== 'all' && t.market   !== anMarket) return false;
+    if (anDisc   !== 'all' && t.discScore < +anDisc)   return false;
+    if (anEmot   !== 'all' && t.emotion  !== anEmot)   return false;
+    return true;
+  });
+
+  const c = document.getElementById('sym-content');
+  if (!closed.length) {
+    c.innerHTML = '<div class="empty" style="padding:30px 0"><div class="empty-icon">📊</div><h3>此條件下無交易紀錄</h3><p>調整篩選條件，或先累積更多交易紀錄</p></div>';
+    return;
+  }
+
+  // Overall summary for this filter
+  const wins   = closed.filter(t => t.pnl > 0);
+  const losses = closed.filter(t => t.pnl <= 0);
+  const wr     = Math.round(wins.length / closed.length * 100);
+  const totalPnL = closed.reduce((a,t) => a + t.pnl, 0);
+  const avgW   = wins.length   ? wins.reduce((a,t)=>a+t.pnl,0)/wins.length : 0;
+  const avgL   = losses.length ? Math.abs(losses.reduce((a,t)=>a+t.pnl,0)/losses.length) : 1;
+  const pf     = losses.length ? (avgW * wins.length) / (avgL * losses.length) : 99;
+
+  // Build symbol breakdown
+  const symMap = {};
+  closed.forEach(t => {
+    if (!symMap[t.sym]) symMap[t.sym] = [];
+    symMap[t.sym].push(t);
+  });
+  const rows = Object.entries(symMap).map(([sym, arr]) => {
+    const w  = arr.filter(t => t.pnl > 0);
+    const l  = arr.filter(t => t.pnl <= 0);
+    const wr = Math.round(w.length / arr.length * 100);
+    const pnl = arr.reduce((a,t) => a + t.pnl, 0);
+    const avgD = arr.reduce((a,t)=>a+t.discScore,0)/arr.length;
+    const avgRR = arr.filter(t=>t.sl&&t.tp).map(t=>Math.abs(t.tp-t.entry)/Math.abs(t.entry-t.sl));
+    const avgRRval = avgRR.length ? avgRR.reduce((a,v)=>a+v,0)/avgRR.length : null;
+    return { sym, n: arr.length, wins: w.length, losses: l.length, wr, pnl, avgD, avgRRval, trades: arr };
+  }).sort((a,b) => b.n - a.n);
+
+  const wrColor = wr >= 55 ? 'var(--green)' : wr >= 45 ? 'var(--amber)' : 'var(--red)';
+  const pfColor = pf >= 1.5 ? 'var(--green)' : pf >= 1 ? 'var(--amber)' : 'var(--red)';
+
+  c.innerHTML = `
+    <div class="an-summary-bar">
+      <span style="font-size:12px;color:var(--text-2)">篩選結果：<strong>${closed.length}</strong> 筆交易</span>
+      <span class="an-pill" style="background:${wr>=55?'var(--green-light)':wr>=45?'var(--amber-light)':'var(--red-light)'};color:${wrColor}">勝率 ${wr}%</span>
+      <span class="an-pill" style="background:var(--bg);color:var(--text-2)">獲利因子 <span style="color:${pfColor};font-weight:700">${pf===99?'∞':pf.toFixed(2)}</span></span>
+      <span class="an-pill" style="background:var(--bg);color:${totalPnL>=0?'var(--green)':'var(--red)'}">累計 ${totalPnL>=0?'+':''}${Math.round(totalPnL).toLocaleString()} 元</span>
+    </div>
+    ${rows.map(r => {
+      const bc = r.wr >= 60 ? '#2a7a3a' : r.wr >= 45 ? '#b06010' : '#c0291e';
+      const verdict = r.wr >= 60 && r.pnl > 0 ? '🏆 拿手股' : r.wr < 40 && r.pnl < 0 ? '⚠ 剋星股' : r.n < 3 ? '樣本不足' : '持續觀察';
+      const vcol = verdict.includes('拿手') ? 'var(--green)' : verdict.includes('剋星') ? 'var(--red)' : 'var(--text-3)';
+      const inWatch = watchList.some(w => w.sym === r.sym && w.status === 'watching');
+      return `<div class="an-card">
+        <div class="an-top">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="an-sym">${r.sym}</span>
+            <span class="badge" style="background:${r.wr>=60?'var(--green-light)':r.wr>=45?'var(--amber-light)':'var(--red-light)'};color:${bc}">勝率 ${r.wr}%</span>
+            <span style="font-size:12px;font-weight:600;color:${vcol}">${verdict}</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            ${!inWatch ? `<button class="btn-fill-exit" onclick="quickAddWatch('${r.sym}')">＋ 加入觀察</button>` : '<span style="font-size:11px;color:var(--blue);padding:5px 8px">👁 觀察中</span>'}
+          </div>
+        </div>
+        <div class="an-stats">
+          <div class="an-stat"><div class="an-stat-label">交易次數</div><div class="an-stat-val">${r.n} 筆</div></div>
+          <div class="an-stat"><div class="an-stat-label">累計損益</div><div class="an-stat-val" style="color:${r.pnl>=0?'var(--green)':'var(--red)'}">${r.pnl>=0?'+':''}${Math.round(r.pnl).toLocaleString()}</div></div>
+          <div class="an-stat"><div class="an-stat-label">平均紀律分</div><div class="an-stat-val">${r.avgD.toFixed(1)}/5</div></div>
+          <div class="an-stat"><div class="an-stat-label">平均R:R</div><div class="an-stat-val">${r.avgRRval?'1:'+r.avgRRval.toFixed(1):'—'}</div></div>
+        </div>
+        <div class="an-trades">
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);margin-bottom:4px">交易明細</div>
+          ${r.trades.map(t => `<div class="an-trade-row">
+            <span>${t.date}</span>
+            <span>${dirL[t.dir]||t.dir}</span>
+            <span>進 ${t.entry} → 出 ${t.exit}</span>
+            <span style="font-weight:600;color:${t.pnl>=0?'var(--green)':'var(--red)'}">${t.pnl>=0?'+':''}${Math.round(t.pnl).toLocaleString()}元 (${t.pct.toFixed(1)}%)</span>
+            <span style="color:var(--text-3)">${exitL[t.exitReason]||'—'}</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="font-size:12px;color:var(--text-3);padding:8px 0 0">
+      拿手股：勝率 ≥ 60% 且累計獲利 · 剋星股：勝率 &lt; 40% 且累計虧損 · 建議 ≥ 3筆才有參考意義
+    </div>
+  `;
+}
+
+function quickAddWatch(sym){
+  watchList.unshift({ id:Date.now(), sym, strategy:'', priority:'mid', entryRange:'', trigger:'', date:new Date().toISOString().slice(0,10), reason:'從歷史分析新增觀察', status:'watching' });
+  saveWatch_data();
+  renderSymbols();
+  toast('✓ ' + sym + ' 已加入觀察名單');
+}
+
+
+// ── PIN Lock ──
+const PIN_KEY   = 'tradeJournalPin';
+const PIN_SESS  = 'tradeJournalPinAuth';
+let pinBuffer   = '';
+let pinMode     = 'login'; // login | setup | setup2 | change_old | change_new | change_new2
+let pinFirst    = '';      // stores first entry during setup/change
+
+function pinHash(str) {
+  // Simple non-crypto hash — enough to prevent casual snooping
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h * 0x01000193) >>> 0;
+  }
+  return h.toString(16);
+}
+
+function pinInit() {
+  const stored  = localStorage.getItem(PIN_KEY);
+  const sessOk  = sessionStorage.getItem(PIN_SESS) === '1';
+  const overlay = document.getElementById('pin-overlay');
+
+  if (sessOk && stored) {
+    // Already authenticated this session
+    overlay.style.display = 'none';
+    return;
+  }
+  if (!stored) {
+    // First time — setup mode
+    pinMode = 'setup';
+    document.getElementById('pin-title').textContent = '設定 PIN 碼';
+    document.getElementById('pin-sub').textContent = '請設定 4 位數 PIN 碼，用於保護你的交易紀錄';
+    document.getElementById('pin-setup-hint').style.display = 'block';
+  } else {
+    pinMode = 'login';
+    document.getElementById('pin-title').textContent = '輸入 PIN 碼';
+    document.getElementById('pin-sub').textContent = '請輸入 PIN 碼以進入';
+    document.getElementById('pin-change-link').style.display = 'inline-block';
+  }
+  overlay.style.display = 'flex';
+}
+
+function pinUpdateDots(color) {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd' + i);
+    d.classList.toggle('filled', i < pinBuffer.length && color !== 'error');
+    d.classList.toggle('error', i < pinBuffer.length && color === 'error');
+  }
+}
+
+function pinKey(k) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += k;
+  document.getElementById('pin-error').textContent = '';
+  pinUpdateDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(() => pinSubmit(), 120);
+  }
+}
+
+function pinDel() {
+  if (!pinBuffer.length) return;
+  pinBuffer = pinBuffer.slice(0, -1);
+  pinUpdateDots();
+  document.getElementById('pin-error').textContent = '';
+}
+
+function pinError(msg) {
+  pinUpdateDots('error');
+  document.getElementById('pin-error').textContent = msg;
+  setTimeout(() => {
+    pinBuffer = '';
+    pinUpdateDots();
+  }, 600);
+}
+
+function pinSuccess() {
+  sessionStorage.setItem(PIN_SESS, '1');
+  document.getElementById('pin-overlay').style.display = 'none';
+}
+
+function pinSubmit() {
+  const h = pinHash(pinBuffer);
+  const stored = localStorage.getItem(PIN_KEY);
+
+  if (pinMode === 'login') {
+    if (h === stored) { pinSuccess(); }
+    else { pinError('PIN 碼錯誤，請再試一次'); }
+
+  } else if (pinMode === 'setup') {
+    pinFirst = pinBuffer;
+    pinBuffer = '';
+    pinMode = 'setup2';
+    document.getElementById('pin-title').textContent = '確認 PIN 碼';
+    document.getElementById('pin-sub').textContent = '請再輸入一次確認';
+    document.getElementById('pin-setup-hint').style.display = 'none';
+    pinUpdateDots();
+
+  } else if (pinMode === 'setup2') {
+    if (pinBuffer === pinFirst) {
+      localStorage.setItem(PIN_KEY, h);
+      toast('✓ PIN 碼設定完成');
+      pinSuccess();
+    } else {
+      pinFirst = '';
+      pinMode = 'setup';
+      document.getElementById('pin-title').textContent = '設定 PIN 碼';
+      document.getElementById('pin-sub').textContent = '請設定 4 位數 PIN 碼，用於保護你的交易紀錄';
+      pinError('兩次輸入不一致，請重新設定');
+    }
+
+  } else if (pinMode === 'change_old') {
+    if (h === stored) {
+      pinBuffer = '';
+      pinMode = 'change_new';
+      document.getElementById('pin-title').textContent = '輸入新 PIN 碼';
+      document.getElementById('pin-sub').textContent = '請輸入你的新 4 位數 PIN 碼';
+      pinUpdateDots();
+    } else {
+      pinError('舊 PIN 碼錯誤，請再試一次');
+    }
+
+  } else if (pinMode === 'change_new') {
+    pinFirst = pinBuffer;
+    pinBuffer = '';
+    pinMode = 'change_new2';
+    document.getElementById('pin-title').textContent = '確認新 PIN 碼';
+    document.getElementById('pin-sub').textContent = '請再輸入一次確認';
+    pinUpdateDots();
+
+  } else if (pinMode === 'change_new2') {
+    if (pinBuffer === pinFirst) {
+      localStorage.setItem(PIN_KEY, h);
+      toast('✓ PIN 碼已更新');
+      pinSuccess();
+    } else {
+      pinFirst = '';
+      pinMode = 'change_new';
+      document.getElementById('pin-title').textContent = '輸入新 PIN 碼';
+      document.getElementById('pin-sub').textContent = '請輸入你的新 4 位數 PIN 碼';
+      pinError('兩次輸入不一致，請重新輸入');
+    }
+  }
+
+  if (pinMode !== 'setup2' && pinMode !== 'change_new2') pinBuffer = '';
+}
+
+function pinStartChange() {
+  pinMode = 'change_old';
+  pinBuffer = '';
+  pinFirst  = '';
+  document.getElementById('pin-title').textContent = '變更 PIN 碼';
+  document.getElementById('pin-sub').textContent = '請先輸入目前的 PIN 碼';
+  document.getElementById('pin-change-link').style.display = 'none';
+  document.getElementById('pin-error').textContent = '';
+  pinUpdateDots();
+}
+
+// Keyboard support
+document.addEventListener('keydown', e => {
+  if (document.getElementById('pin-overlay').style.display === 'none') return;
+  if (e.key >= '0' && e.key <= '9') pinKey(e.key);
+  if (e.key === 'Backspace') pinDel();
+});
+
+// Init on load
+pinInit();
+
+// ── Initial render ──
+sw('log');
+</script>
+
+<!-- PIN Lock Overlay -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-box">
+    <div class="pin-logo">Trade Journal</div>
+    <div class="pin-title" id="pin-title">輸入 PIN 碼</div>
+    <div class="pin-sub" id="pin-sub">請輸入 4 位數 PIN 碼以進入</div>
+    <div class="pin-dots" id="pin-dots">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key empty"></button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-setup-hint" id="pin-setup-hint" style="display:none">
+      首次使用請設定 PIN 碼，下次開啟時需要輸入
+    </div>
+    <span class="pin-change-link" id="pin-change-link" style="display:none" onclick="pinStartChange()">變更 PIN 碼</span>
+  </div>
+</div>
+
+</body>
+</html>
